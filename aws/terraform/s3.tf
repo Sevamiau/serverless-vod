@@ -1,9 +1,6 @@
-resource "random_id" "bucket_id" {
-  byte_length = 4
-}
 resource "aws_s3_bucket" "site_bucket" {
-  bucket        = "site-bucket-${random_id.bucket_id.hex}"
-  force_destroy = true
+  bucket_prefix = "site-bucket"  
+  force_destroy = true  
 }
 
 resource "aws_s3_bucket_public_access_block" "site" {
