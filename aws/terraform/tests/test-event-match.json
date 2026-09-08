@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "context": { "eventType": "viewer-request" },
+  "viewer": { "ip": "1.2.3.4" },
+  "request": {
+    "method": "GET",
+    "uri": "/movie/test.txt",
+    "querystring": {},
+    "headers": {
+      "host": { "value": "d2on72j9tqcbnv.cloudfront.net" },
+      "referer": { "value": "https://d2on72j9tqcbnv.cloudfront.net/index.html" }
+    },
+    "cookies": {}
+  }
+}

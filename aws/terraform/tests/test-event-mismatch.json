@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "context": { "eventType": "viewer-request" },
+  "viewer": { "ip": "1.2.3.4" },
+  "request": {
+    "method": "GET",
+    "uri": "/movie/test.txt",
+    "querystring": {},
+    "headers": {
+      "host": { "value": "<dist-domain>" },
+      "referer": { "value": "https://dogs.example.com/puppy" }
+    },
+    "cookies": {}
+  }
+}
