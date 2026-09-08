@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "site_bucket" {
-  bucket_prefix = "site-bucket"  
+  bucket_prefix = "site-bucket-"  
   force_destroy = true  
 }
 
