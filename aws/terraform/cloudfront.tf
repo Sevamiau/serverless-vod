@@ -35,7 +35,13 @@ resource "aws_cloudfront_distribution" "distribution" {
 
     viewer_protocol_policy = "redirect-to-https"
     trusted_key_groups     = [aws_cloudfront_key_group.movie_key_group.id]
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.referer_lock.arn
+    }
   }
+
 
   price_class = "PriceClass_100"
 
