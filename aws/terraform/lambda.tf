@@ -40,10 +40,21 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role = aws_iam_role.lambda_role.id
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_lambda_function_url" "playback_token_url" {
+  function_name = aws_lambda_function.playback_token.function_name
+  authorization_type = "AWS_IAM"
+}
+
+
+
 data "aws_kms_alias" "ssm_default" {
   name = "alias/aws/ssm"
 }
-
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
