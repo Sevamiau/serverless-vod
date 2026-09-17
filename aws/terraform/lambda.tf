@@ -50,7 +50,13 @@ resource "aws_lambda_function_url" "playback_token_url" {
   authorization_type = "AWS_IAM"
 }
 
-
+resource "aws_lambda_permission" "allow_function_url" {
+  action        = "lambda:InvokeFunctionUrl"
+  function_name = aws_lambda_function.playback_token.function_name
+  principal     = "cloudfront.amazonaws.com"
+  source_arn    = aws_cloudfront_distribution.distribution.arn
+  function_url_auth_type = "AWS_IAM"
+}
 
 data "aws_kms_alias" "ssm_default" {
   name = "alias/aws/ssm"
@@ -77,4 +83,11 @@ resource "aws_lambda_function" "playback_token" {
       PUBLIC_KEY_ID = aws_cloudfront_public_key.movie_key.id
     }
   }
+}
+
+resource "aws_cloudfront_origin_access_control" "lambda_oac" {
+  name = "lambda_oac"
+  origin_access_control_origin_type = "lambda"
+  signing_behavior = "always"
+  signing_protocol = "sigv4"
 }
