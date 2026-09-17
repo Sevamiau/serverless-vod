@@ -58,6 +58,14 @@ resource "aws_lambda_permission" "allow_function_url" {
   function_url_auth_type = "AWS_IAM"
 }
 
+resource "aws_lambda_permission" "allow_function_url_invoke_function" {
+  action                  = "lambda:InvokeFunction"
+  function_name           = aws_lambda_function.playback_token.function_name
+  principal               = "cloudfront.amazonaws.com"
+  source_arn              = aws_cloudfront_distribution.distribution.arn
+  function_url_auth_type  = "AWS_IAM"
+}
+
 data "aws_kms_alias" "ssm_default" {
   name = "alias/aws/ssm"
 }
@@ -79,9 +87,11 @@ resource "aws_lambda_function" "playback_token" {
 
   environment {
     variables = {
-      DISTRIBUTION_DOMAIN = aws_cloudfront_distribution.distribution.domain_name
       PUBLIC_KEY_ID = aws_cloudfront_public_key.movie_key.id
     }
+  }
+  lifecycle {
+    ignore_changes = [environment]
   }
 }
 
@@ -90,4 +100,14 @@ resource "aws_cloudfront_origin_access_control" "lambda_oac" {
   origin_access_control_origin_type = "lambda"
   signing_behavior = "always"
   signing_protocol = "sigv4"
+}
+
+
+resource "null_resource" "set_lambda_distribution_domian" {
+  triggers = {
+    lambda_distribution_domain = aws_cloudfront_distribution.distribution.domain_name
+  }
+  provisioner "local-exec" {
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},PUBLIC_KEY_ID=${aws_cloudfront_public_key.movie_key.id}}'"
+  }
 }

@@ -11,6 +11,19 @@ resource "aws_cloudfront_distribution" "distribution" {
     origin_id                = "s3-movie-bucket"
   }
 
+  origin {
+    domain_name              = trimsuffix(trimprefix(aws_lambda_function_url.playback_token_url.function_url, "https://"), "/")
+    origin_access_control_id = aws_cloudfront_origin_access_control.lambda_oac.id
+    origin_id                = "lambda-playback-token"
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+  
+
   enabled             = true
   is_ipv6_enabled     = true
   comment             = "CloudFront distribution for site and movie buckets"
@@ -40,6 +53,17 @@ resource "aws_cloudfront_distribution" "distribution" {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.referer_lock.arn
     }
+  }
+
+  ordered_cache_behavior {
+    path_pattern     = "/api/*"
+    allowed_methods  = ["DELETE","GET","HEAD","OPTIONS","PATCH","POST","PUT"]
+    cached_methods   = ["GET","HEAD"]
+    target_origin_id = "lambda-playback-token"
+    cache_policy_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+
+    viewer_protocol_policy = "redirect-to-https"
   }
 
 
