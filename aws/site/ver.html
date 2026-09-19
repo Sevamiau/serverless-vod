@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>serverless-vod &middot; playback check</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<style>
+  body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; }
+  video { width: 100%; background: #000; border-radius: 6px; }
+  button { font: inherit; padding: 10px 18px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Step 6 playback check</h1>
+  <p>Mints a real playback cookie via <code>/api/playback-token</code>, then loads <code>/movie/master.m3u8</code> with it &mdash; the same path curl has been exercising, now through an actual player.</p>
+  <button id="play">Play</button>
+  <div id="status"></div>
+  <video id="video" controls></video>
+</main>
+<script>
+  const statusEl = document.getElementById('status');
+  const video = document.getElementById('video');
+  const playBtn = document.getElementById('play');
+
+  function log(line) {
+    statusEl.textContent += line + '\n';
+  }
+
+  async function start() {
+    playBtn.disabled = true;
+    statusEl.textContent = '';
+
+    log('POST /api/playback-token?buyer=demo ...');
+    const res = await fetch('/api/playback-token?buyer=demo', {
+      method: 'POST',
+      credentials: 'include', // the whole point: cookies must land on this origin so /movie/* can read them back
+    });
+    if (!res.ok) {
+      log(`mint failed: HTTP ${res.status}`);
+      playBtn.disabled = false;
+      return;
+    }
+    log(`mint OK: HTTP ${res.status}`);
+
+    const src = '/movie/master.m3u8'; // relative: same CloudFront domain the cookies are scoped to, no CORS involved
+
+    if (Hls.isSupported()) {
+      log('using hls.js');
+      const hls = new Hls();
+      hls.on(Hls.Events.ERROR, (_evt, data) => log(`hls.js error: ${data.type} / ${data.details}`));
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari plays HLS natively; hls.js explicitly refuses to run there instead of double-handling it.
+      log('native HLS support (Safari) — skipping hls.js');
+      video.src = src;
+    } else {
+      log('no HLS support in this browser');
+      playBtn.disabled = false;
+      return;
+    }
+
+    try {
+      await video.play();
+      log('playing');
+    } catch (err) {
+      // autoplay policies commonly block this; controls are still visible for a manual click
+      log(`video.play() rejected (${err.message}) — use the player controls`);
+    }
+    playBtn.disabled = false;
+  }
+
+  playBtn.addEventListener('click', start);
+</script>
+</body>
+</html>
