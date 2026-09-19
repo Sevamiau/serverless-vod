@@ -4,4 +4,6 @@
 crash.log
 *.tfvars
 !*.tfvars.example
-
+index.zip
+cookies.txt 
+plan.txt
