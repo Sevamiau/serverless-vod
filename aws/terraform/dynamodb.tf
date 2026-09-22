@@ -98,17 +98,6 @@ resource "aws_dynamodb_table" "users" {
   }
 }
 
-resource "aws_dynamodb_table" "users" {
-  name         = "svod-users"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "email"
-
-  attribute {
-    name = "email"
-    type = "S"
-  }
-}
-
 resource "aws_dynamodb_table" "orders" {
   name         = "svod-orders"
   billing_mode = "PAY_PER_REQUEST"
