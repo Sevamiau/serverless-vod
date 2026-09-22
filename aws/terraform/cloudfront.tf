@@ -22,7 +22,18 @@ resource "aws_cloudfront_distribution" "distribution" {
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
-  
+
+  origin {
+    domain_name              = trimsuffix(trimprefix(aws_lambda_function_url.api_url.function_url, "https://"), "/")
+    origin_access_control_id = aws_cloudfront_origin_access_control.api_oac.id
+    origin_id                = "lambda-api"
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
 
   enabled             = true
   is_ipv6_enabled     = true
@@ -56,10 +67,21 @@ resource "aws_cloudfront_distribution" "distribution" {
   }
 
   ordered_cache_behavior {
-    path_pattern     = "/api/*"
+    path_pattern     = "/api/playback-token"
     allowed_methods  = ["DELETE","GET","HEAD","OPTIONS","PATCH","POST","PUT"]
     cached_methods   = ["GET","HEAD"]
     target_origin_id = "lambda-playback-token"
+    cache_policy_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+
+    viewer_protocol_policy = "redirect-to-https"
+  }
+
+  ordered_cache_behavior {
+    path_pattern     = "/api/*"
+    allowed_methods  = ["DELETE","GET","HEAD","OPTIONS","PATCH","POST","PUT"]
+    cached_methods   = ["GET","HEAD"]
+    target_origin_id = "lambda-api"
     cache_policy_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
     origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 
@@ -90,6 +112,13 @@ resource "aws_cloudfront_origin_access_control" "site_oac" {
 resource "aws_cloudfront_origin_access_control" "movie_oac" {
   name                              = "movie_oac"
   origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_origin_access_control" "api_oac" {
+  name                              = "api_oac"
+  origin_access_control_origin_type = "lambda"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
 }
