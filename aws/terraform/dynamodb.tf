@@ -15,54 +15,54 @@ resource "aws_dynamodb_table" "sessions" {
 }
 
 resource "aws_dynamodb_table" "magic_links" {
-    name        = "svod-magic-links"
-    billing_mode = "PAY_PER_REQUEST"
-    hash_key    = "tokenHash"
+  name         = "svod-magic-links"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tokenHash"
 
-    attribute {
-        name = "tokenHash"
-        type = "S"
-    }
+  attribute {
+    name = "tokenHash"
+    type = "S"
+  }
 
-    ttl {
-        attribute_name = "expiresAt"
-        enabled        = true
-    }
-   
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
+
 }
 
 resource "aws_dynamodb_table" "entitlements" {
-    name        = "svod-entitlements"
-    billing_mode = "PAY_PER_REQUEST"
-    hash_key    = "userEmail"
-    range_key   = "productId"
+  name         = "svod-entitlements"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "userEmail"
+  range_key    = "productId"
 
-    attribute {
-        name = "userEmail"
-        type = "S"
-    }
+  attribute {
+    name = "userEmail"
+    type = "S"
+  }
 
-    attribute {
-        name = "productId"
-        type = "S"
-    }
+  attribute {
+    name = "productId"
+    type = "S"
+  }
 }
 
 resource "aws_dynamodb_table" "devices" {
-    name = "svod-devices"
-    billing_mode = "PAY_PER_REQUEST"
-    hash_key    = "userEmail"
-    range_key   = "deviceHash"
+  name         = "svod-devices"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "userEmail"
+  range_key    = "deviceHash"
 
-    attribute {
-        name = "userEmail"
-        type = "S"
-    }
+  attribute {
+    name = "userEmail"
+    type = "S"
+  }
 
-    attribute {
-        name = "deviceHash"
-        type = "S"
-    }
+  attribute {
+    name = "deviceHash"
+    type = "S"
+  }
 }
 
 resource "aws_dynamodb_table" "play_events" {

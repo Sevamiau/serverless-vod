@@ -9,8 +9,11 @@ resource "aws_iam_role" "api_lambda_role" {
         Effect = "Allow"
         Principal = {
           Service = "lambda.amazonaws.com"
+
+
         }
       },
+      
     ]
   })
 }
@@ -77,11 +80,11 @@ resource "aws_lambda_function_url" "api_url" {
 }
 
 resource "aws_lambda_permission" "allow_function_url_api" {
-  action                  = "lambda:InvokeFunctionUrl"
-  function_name           = aws_lambda_function.api.function_name
-  principal               = "cloudfront.amazonaws.com"
-  source_arn              = aws_cloudfront_distribution.distribution.arn
-  function_url_auth_type  = "AWS_IAM"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.api.function_name
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.distribution.arn
+  function_url_auth_type = "AWS_IAM"
 }
 
 resource "aws_lambda_permission" "allon_api" {
@@ -97,5 +100,5 @@ resource "null_resource" "set_api_lambda_distribution_domain" {
   }
   provisioner "local-exec" {
     command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name}}'"
- }
+  }
 }

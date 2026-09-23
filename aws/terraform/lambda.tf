@@ -36,34 +36,58 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Effect   = "Allow"
         Resource = data.aws_kms_alias.ssm_default.target_key_arn
       },
+          {
+        Action = [
+          "dynamodb:GetItem",
+        ]
+        Effect = "Allow"
+        Resource = [
+          aws_dynamodb_table.sessions.arn,
+          aws_dynamodb_table.entitlements.arn,
+        ]
+      },
+      {
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ]
+        Effect = "Allow"
+        Resource = [
+          aws_dynamodb_table.devices.arn,
+          aws_dynamodb_table.play_events.arn,
+        ]
+      },
+   
     ]
   })
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
-  role = aws_iam_role.lambda_role.id
+  role       = aws_iam_role.lambda_role.id
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_lambda_function_url" "playback_token_url" {
-  function_name = aws_lambda_function.playback_token.function_name
+  function_name      = aws_lambda_function.playback_token.function_name
   authorization_type = "AWS_IAM"
 }
 
 resource "aws_lambda_permission" "allow_function_url" {
-  action        = "lambda:InvokeFunctionUrl"
-  function_name = aws_lambda_function.playback_token.function_name
-  principal     = "cloudfront.amazonaws.com"
-  source_arn    = aws_cloudfront_distribution.distribution.arn
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.playback_token.function_name
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.distribution.arn
   function_url_auth_type = "AWS_IAM"
 }
 
 resource "aws_lambda_permission" "allow_function_url_invoke_function" {
-  action                  = "lambda:InvokeFunction"
-  function_name           = aws_lambda_function.playback_token.function_name
-  principal               = "cloudfront.amazonaws.com"
-  source_arn              = aws_cloudfront_distribution.distribution.arn
- # function_url_auth_type  = "AWS_IAM" ---> Check why "lambda:InovkeFunction" does not support function_url_auth_type
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.playback_token.function_name
+  principal     = "cloudfront.amazonaws.com"
+  source_arn    = aws_cloudfront_distribution.distribution.arn
+  # function_url_auth_type  = "AWS_IAM" ---> Check why "lambda:InovkeFunction" does not support function_url_auth_type
 }
 
 data "aws_kms_alias" "ssm_default" {
@@ -72,7 +96,7 @@ data "aws_kms_alias" "ssm_default" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file  = "${path.module}/lambda/playback-token/index.mjs"
+  source_file = "${path.module}/lambda/playback-token/index.mjs"
   output_path = "${path.module}/lambda/playback-token/index.zip"
 }
 
@@ -96,10 +120,10 @@ resource "aws_lambda_function" "playback_token" {
 }
 
 resource "aws_cloudfront_origin_access_control" "lambda_oac" {
-  name = "lambda_oac"
+  name                              = "lambda_oac"
   origin_access_control_origin_type = "lambda"
-  signing_behavior = "always"
-  signing_protocol = "sigv4"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
 }
 
 
