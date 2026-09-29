@@ -36,7 +36,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Effect   = "Allow"
         Resource = data.aws_kms_alias.ssm_default.target_key_arn
       },
-          {
+      {
         Action = [
           "dynamodb:GetItem",
         ]
@@ -59,7 +59,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           aws_dynamodb_table.play_events.arn,
         ]
       },
-   
+
     ]
   })
 }

@@ -114,7 +114,7 @@ async function getPrivateKey() {
 without it, SSM would hand back the encrypted ciphertext. This call needs the
 Lambda's execution role to have both `ssm:GetParameter` on this specific parameter
 *and* `kms:Decrypt` permission, since SSM delegates the actual decryption to KMS
-under the hood. That IAM policy is part of `lambda.tf`, still to be written.
+under the hood. That IAM policy lives in `lambda.tf`, applied and working.
 
 ## The handler, request to response
 
@@ -187,11 +187,17 @@ HTTP connection even by mistake.
 `Key-Pair-Id` isn't encoded at all — it's just the ID of the public key CloudFront
 should check the signature against, plain text, since it's not sensitive.
 
-## Why this can only be fully verified after deployment
+## Verified, and what actually needed fixing to get there
 
 Every function here (`buildPolicy`, `cloudfrontSafeBase64`, `signPolicy`) was tested
-in isolation locally before being assembled — but the handler as a whole needs a real
-SSM parameter, a real distribution domain, and a real CloudFront edge to check the
-result against. That's `lambda.tf`'s job to make possible, and the real verification
-step, once it exists: a `curl -X POST` for the cookies, then replaying them against
-`/movie/*` and watching a `403` finally turn into a `200`.
+in isolation locally before being assembled, and the handler as a whole is now
+verified end to end: `curl -X POST /api/playback-token` returns real cookies, and
+replaying them against `/movie/*` returns a `200`, not a `403`.
+
+Worth noting explicitly: nothing in *this file* needed to change to get there. The
+code above worked exactly as designed on the first real invocation. The two genuine
+bugs that made Step 5 hard — a circular Terraform dependency between the Lambda and
+the distribution's own domain name, and a brand-new AWS requirement that Function URL
+resource policies grant both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` —
+were both entirely in the surrounding infrastructure (`lambda.tf`, `cloudfront.tf`),
+not in the JavaScript. See `STEP5-SESSION-2-NOTES.md` for the full account.
