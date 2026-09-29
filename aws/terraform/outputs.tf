@@ -9,4 +9,3 @@ output "movie_bucket_name" {
 output "distribution_domain_name" {
   value = aws_cloudfront_distribution.distribution.domain_name
 }
-

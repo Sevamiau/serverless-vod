@@ -1,12 +1,111 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
 
+const CFG = {
+  productId: 'film01',
+  price: { currency: 'ARS', amount: 5000 },
+}
+
+export function traceCode() {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(randomBytes(6), (b) => A[b % A.length]).join('');
+}
+
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+
+async function upsertUser(email) {
+  const normalized = email.trim().toLowerCase();
+
+  const existing = await ddb.send(new GetCommand({
+    TableName: 'svod-users',
+    Key: { email: normalized },
+  }));
+
+  if (existing.Item) return existing.Item;
+
+  const newUser = { email: normalized, createdAt: Math.floor(Date.now() / 1000) };
+  await ddb.send(new PutCommand({
+    TableName: 'svod-users',
+    Item: newUser,
+  }));
+
+  return newUser;
+}
+
+async function handleCheckout(event) {
+  const body = JSON.parse(event.body || '{}');
+  const email = body.email ?? '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'email inválido' }) };
+  }
+
+  const user = await upsertUser(email);
+  const orderId = randomUUID();
+  const claim = randomBytes(24).toString('base64url');
+  const trace = traceCode();
+
+  await ddb.send(new PutCommand({
+    TableName: 'svod-orders',
+    Item: {
+      orderId,
+      claim,
+      userEmail: user.email,
+      productId: CFG.productId,
+      currency: CFG.price.currency,
+      amount: CFG.price.amount,
+      status: 'pending',
+      traceCode: trace,
+      createdAt: Math.floor(Date.now() / 1000),
+    },
+  }));
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ redirect: `/pagar?order_id=${orderId}` }),
+    cookies: [`poc_claim=${claim}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`],
+  };
+}
+
+async function handleOrderStatus(event) {
+  const claimCookie = (event.cookies || []).find((c) => c.startsWith('poc_claim='));
+  if (!claimCookie) {
+    return { statusCode: 200, body: JSON.stringify({ status: 'unknown', reason: 'no-claim-cookie' }) };
+  }
+  const claim = claimCookie.slice('poc_claim='.length);
+
+  const orderResult = await ddb.send(new QueryCommand({
+    TableName: 'svod-orders',
+    IndexName: 'claim-index',
+    KeyConditionExpression: 'claim = :claim',
+    ExpressionAttributeValues: { ':claim': claim },
+  }));
+  const order = orderResult.Items?.[0];
+
+  if (!order) {
+    return { statusCode: 200, body: JSON.stringify({ status: 'unknown', reason: 'no-such-order' }) };
+  }
+  if (order.status !== 'paid') {
+    return { statusCode: 200, body: JSON.stringify({ status: order.status }) };
+  }
+
+  const sessionToken = randomBytes(32).toString('base64url');
+  const sessionHash = sha256(sessionToken);
+  await ddb.send(new PutCommand({
+    TableName: 'svod-sessions',
+    Item: { tokenHash: sessionHash, userEmail: order.userEmail, expiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 },
+  }));
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ status: 'paid', traceCode: order.traceCode }),
+    cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax`],
+  };
+}
 
 async function handleAuthRequest(event) {
   const body = JSON.parse(event.body || '{}');
@@ -47,6 +146,8 @@ export const handler = async (event) => {
   const routes = {
     'POST /api/auth/request': handleAuthRequest,
     'GET /api/auth/callback': handleAuthCallback,
+    'POST /api/checkout': handleCheckout,
+    'GET /api/order-status': handleOrderStatus,
   };
 
   const fn = routes[`${method} ${path}`];

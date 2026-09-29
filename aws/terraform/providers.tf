@@ -1,4 +1,3 @@
-
 terraform {
   required_version = "~> 1.9"
 
@@ -10,8 +9,6 @@ terraform {
   }
 }
 
-
 provider "aws" {
   region = "sa-east-1"
 }
-

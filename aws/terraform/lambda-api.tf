@@ -31,6 +31,21 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.users.arn
       },
       {
+        Action   = ["dynamodb:PutItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.users.arn
+      },
+      {
+        Action   = ["dynamodb:putItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.orders.arn
+      },
+      {
+        Action   = ["dynamodb:UpdateItem", "dynamodb:Query"]
+        Effect   = "Allow"
+        Resource = "${aws_dynamodb_table.orders.arn}/index/claim-index"
+      },
+      {
         Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.magic_links.arn
