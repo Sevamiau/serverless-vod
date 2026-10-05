@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>serverless-vod &middot; comprar</title>
+<style>
+  body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; }
+  input { font: inherit; width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; margin-bottom: 12px; }
+  button { font: inherit; padding: 10px 18px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>La película &mdash; $5000 ARS</h1>
+  <p>Ingresá tu email. Vamos a crear la orden y te mandamos a pagar con Mercado Pago.</p>
+  <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
+  <button id="buy">Comprar</button>
+  <div id="status"></div>
+</main>
+<script>
+  const statusEl = document.getElementById('status');
+  const buyBtn = document.getElementById('buy');
+  const emailInput = document.getElementById('email');
+
+  function log(line) {
+    statusEl.textContent += line + '\n';
+  }
+
+  // CloudFront's OAC signs the hop to the Lambda Function URL origin, but it
+  // doesn't buffer/hash the body itself - a POST with a body has to arrive
+  // with its own x-amz-content-sha256 already set, or Lambda's SigV4
+  // authorizer rejects it before our code ever runs (see
+  // docs/CLOUDFRONT-OAC-LAMBDA-BODY-BUG.md).
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function buy() {
+    const email = emailInput.value.trim();
+    if (!email) {
+      log('ingresá un email primero');
+      return;
+    }
+
+    buyBtn.disabled = true;
+    statusEl.textContent = '';
+    log('POST /api/checkout ...');
+
+    const body = JSON.stringify({ email });
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      credentials: 'include', // poc_claim cookie has to land on this origin
+      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
+      body,
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      log(`checkout failed: HTTP ${res.status} ${body}`);
+      buyBtn.disabled = false;
+      return;
+    }
+
+    const { redirect } = await res.json();
+    log(`checkout OK, redirecting to Mercado Pago...`);
+    window.location.href = redirect;
+  }
+
+  buyBtn.addEventListener('click', buy);
+</script>
+</body>
+</html>

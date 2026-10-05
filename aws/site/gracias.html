@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>serverless-vod &middot; gracias</title>
+<style>
+  body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; }
+  a { color: #4da3ff; }
+  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
+  #trace { font-size: 22px; letter-spacing: 2px; color: #eee; margin: 10px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Procesando tu pago&hellip;</h1>
+  <p id="message">Mercado Pago nos avisa por atrás (webhook) en cuanto confirma el pago &mdash; esto puede tardar unos segundos.</p>
+  <div id="trace"></div>
+  <p id="watch-link" style="display:none"><a href="/ver.html">Ir a ver la película</a></p>
+  <div id="status"></div>
+</main>
+<script>
+  const statusEl = document.getElementById('status');
+  const titleEl = document.getElementById('title');
+  const messageEl = document.getElementById('message');
+  const traceEl = document.getElementById('trace');
+  const watchLinkEl = document.getElementById('watch-link');
+
+  function log(line) {
+    statusEl.textContent += line + '\n';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('status') === 'failure') {
+    titleEl.textContent = 'El pago no se completó';
+    messageEl.textContent = 'Mercado Pago reportó un error o un pago rechazado. Podés intentar de nuevo desde /comprar.';
+  } else {
+    poll();
+  }
+
+  // poc_claim cookie (set during /api/checkout) travels with the browser
+  // through the Mercado Pago redirect and back - order-status reads it, the
+  // order_id in this page's URL is just for a human to glance at.
+  async function poll(attempt = 0) {
+    const res = await fetch('/api/order-status', { credentials: 'include' });
+    const data = await res.json();
+    log(`[${attempt}] status: ${data.status}${data.reason ? ' (' + data.reason + ')' : ''}`);
+
+    if (data.status === 'paid') {
+      titleEl.textContent = '¡Gracias por tu compra!';
+      messageEl.textContent = 'Tu código de copia:';
+      traceEl.textContent = data.traceCode;
+      watchLinkEl.style.display = 'block';
+      return;
+    }
+
+    if (data.status === 'unknown') {
+      titleEl.textContent = 'No encontramos tu orden';
+      messageEl.textContent = 'Probá iniciar la compra de nuevo desde /comprar.';
+      return;
+    }
+
+    if (attempt >= 30) {
+      titleEl.textContent = 'Esto está tardando más de lo normal';
+      messageEl.textContent = 'El pago sigue pendiente después de un minuto. Si ya pagaste, escribinos con tu email.';
+      return;
+    }
+
+    setTimeout(() => poll(attempt + 1), 2000);
+  }
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 const CFG = {
-  productId: 'film-01',
+  productId: 'film01',
   deviceCap: 3,
   concurrencyWindowSec: 60,
 };

@@ -31,14 +31,35 @@
     statusEl.textContent += line + '\n';
   }
 
+  // Stable per-browser ID for the device-cap check - not an identity claim,
+  // just "have I seen this device before" for this signed-in user.
+  function getDeviceId() {
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('deviceId', id);
+    }
+    return id;
+  }
+
+  // Same CloudFront OAC + Lambda body-hash requirement as checkout (see
+  // docs/CLOUDFRONT-OAC-LAMBDA-BODY-BUG.md) - this call now has a body.
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
   async function start() {
     playBtn.disabled = true;
     statusEl.textContent = '';
 
-    log('POST /api/playback-token?buyer=demo ...');
-    const res = await fetch('/api/playback-token?buyer=demo', {
+    log('POST /api/playback-token ...');
+    const body = JSON.stringify({ deviceId: getDeviceId(), label: navigator.userAgent.slice(0, 40) });
+    const res = await fetch('/api/playback-token', {
       method: 'POST',
       credentials: 'include', // the whole point: cookies must land on this origin so /movie/* can read them back
+      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
+      body,
     });
     if (!res.ok) {
       log(`mint failed: HTTP ${res.status}`);

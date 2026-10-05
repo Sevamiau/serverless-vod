@@ -90,6 +90,7 @@ resource "aws_lambda_function" "api" {
   role          = aws_iam_role.api_lambda_role.arn
   handler       = "index.handler"
   runtime       = "nodejs24.x"
+  timeout       = 10
 
   filename         = data.archive_file.api_lambda_zip.output_path
   source_code_hash = data.archive_file.api_lambda_zip.output_base64sha256
