@@ -1,14 +1,56 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
+const ssm = new SSMClient({});
 
 const CFG = {
   productId: 'film01',
+  productTitle: 'La película',
   price: { currency: 'ARS', amount: 5000 },
+}
+
+let cachedMpAccessToken;
+async function getMpAccessToken() {
+  if (cachedMpAccessToken) return cachedMpAccessToken;
+  const r = await ssm.send(new GetParameterCommand({
+    Name: '/serverless-vod/mp-access-token',
+    WithDecryption: true,
+  }));
+  cachedMpAccessToken = r.Parameter.Value;
+  return cachedMpAccessToken;
+}
+
+
+async function createMpPreference({ orderId, email }) {
+  const accessToken = await getMpAccessToken();
+  const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      items: [{
+        title: CFG.productTitle,
+        quantity: 1,
+        currency_id: CFG.price.currency,
+        unit_price: CFG.price.amount,
+      }],
+      payer: { email },
+      external_reference: orderId,
+      notification_url: process.env.MP_WEBHOOK_URL,
+      back_urls: {
+        success: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias?order_id=${orderId}`,
+        failure: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias?order_id=${orderId}&status=failure`,
+      },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`mp-preference-failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
 }
 
 export function traceCode() {
@@ -64,9 +106,11 @@ async function handleCheckout(event) {
     },
   }));
 
+  const preference = await createMpPreference({ orderId, email: user.email });
+
   return {
     statusCode: 200,
-    body: JSON.stringify({ redirect: `/pagar?order_id=${orderId}` }),
+    body: JSON.stringify({ redirect: preference.init_point }),
     cookies: [`poc_claim=${claim}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600`],
   };
 }

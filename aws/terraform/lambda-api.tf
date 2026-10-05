@@ -60,6 +60,16 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Effect   = "Allow"
         Resource = aws_ses_email_identity.sender.arn
       },
+      {
+        Action   = ["ssm:GetParameter"]
+        Effect   = "Allow"
+        Resource = aws_ssm_parameter.mp_access_token.arn
+      },
+      {
+        Action   = ["kms:Decrypt"]
+        Effect   = "Allow"
+        Resource = data.aws_kms_alias.ssm_default.target_key_arn
+      },
     ]
   })
 }
@@ -112,8 +122,9 @@ resource "aws_lambda_permission" "allon_api" {
 resource "null_resource" "set_api_lambda_distribution_domain" {
   triggers = {
     lambda_distribution_domain = aws_cloudfront_distribution.distribution.domain_name
+    mp_webhook_url              = aws_lambda_function_url.webhook_url.function_url
   }
   provisioner "local-exec" {
-    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name}}'"
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
   }
 }
