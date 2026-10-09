@@ -39,9 +39,7 @@
     poll();
   }
 
-  // poc_claim cookie (set during /api/checkout) travels with the browser
-  // through the Mercado Pago redirect and back - order-status reads it, the
-  // order_id in this page's URL is just for a human to glance at.
+ 
   async function poll(attempt = 0) {
     const res = await fetch('/api/order-status', { credentials: 'include' });
     const data = await res.json();

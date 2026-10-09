@@ -11,7 +11,7 @@ const ssm = new SSMClient({});
 const CFG = {
   productId: 'film01',
   productTitle: 'La película',
-  price: { currency: 'ARS', amount: 5000 },
+  price: { currency: 'ARS', amount: 1 },
 }
 
 let cachedMpAccessToken;
@@ -42,9 +42,10 @@ async function createMpPreference({ orderId, email }) {
       external_reference: orderId,
       notification_url: process.env.MP_WEBHOOK_URL,
       back_urls: {
-        success: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias?order_id=${orderId}`,
-        failure: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias?order_id=${orderId}&status=failure`,
+        success: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias.html?order_id=${orderId}`,
+        failure: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias.html?order_id=${orderId}&status=failure`,
       },
+      auto_return: 'approved',
     }),
   });
   if (!res.ok) {
@@ -213,7 +214,7 @@ async function handleAuthCallback(event) {
   const link = linkResult.Item;
 
   if (!link || link.usedAt || link.expiresAt < now) {
-    return { statusCode: 302, headers: { location: '/entrar?error=link' } };
+    return { statusCode: 302, headers: { location: '/entrar.html?error=link' } };
   }
 
   await ddb.send(new UpdateCommand({
@@ -232,7 +233,7 @@ async function handleAuthCallback(event) {
 
   return {
     statusCode: 302,
-    headers: { location: '/ver' },
+    headers: { location: '/ver.html' },
     cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax`],
   };
 }

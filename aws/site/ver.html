@@ -31,8 +31,6 @@
     statusEl.textContent += line + '\n';
   }
 
-  // Stable per-browser ID for the device-cap check - not an identity claim,
-  // just "have I seen this device before" for this signed-in user.
   function getDeviceId() {
     let id = localStorage.getItem('deviceId');
     if (!id) {
@@ -42,8 +40,7 @@
     return id;
   }
 
-  // Same CloudFront OAC + Lambda body-hash requirement as checkout (see
-  // docs/CLOUDFRONT-OAC-LAMBDA-BODY-BUG.md) - this call now has a body.
+
   async function sha256Hex(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -68,7 +65,7 @@
     }
     log(`mint OK: HTTP ${res.status}`);
 
-    const src = '/movie/master.m3u8'; // relative: same CloudFront domain the cookies are scoped to, no CORS involved
+    const src = '/movie/master.m3u8'; 
 
     if (Hls.isSupported()) {
       log('using hls.js');
@@ -90,7 +87,6 @@
       await video.play();
       log('playing');
     } catch (err) {
-      // autoplay policies commonly block this; controls are still visible for a manual click
       log(`video.play() rejected (${err.message}) — use the player controls`);
     }
     playBtn.disabled = false;

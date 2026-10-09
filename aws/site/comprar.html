@@ -15,7 +15,7 @@
 </head>
 <body>
 <main>
-  <h1>La película &mdash; $5000 ARS</h1>
+  <h1>La película &mdash; $1 ARS</h1>
   <p>Ingresá tu email. Vamos a crear la orden y te mandamos a pagar con Mercado Pago.</p>
   <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
   <button id="buy">Comprar</button>
@@ -30,11 +30,6 @@
     statusEl.textContent += line + '\n';
   }
 
-  // CloudFront's OAC signs the hop to the Lambda Function URL origin, but it
-  // doesn't buffer/hash the body itself - a POST with a body has to arrive
-  // with its own x-amz-content-sha256 already set, or Lambda's SigV4
-  // authorizer rejects it before our code ever runs (see
-  // docs/CLOUDFRONT-OAC-LAMBDA-BODY-BUG.md).
   async function sha256Hex(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -54,7 +49,7 @@
     const body = JSON.stringify({ email });
     const res = await fetch('/api/checkout', {
       method: 'POST',
-      credentials: 'include', // poc_claim cookie has to land on this origin
+      credentials: 'include', 
       headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
       body,
     });
