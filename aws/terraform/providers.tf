@@ -10,5 +10,6 @@ terraform {
 }
 
 provider "aws" {
-  region = "sa-east-1"
+  region  = "sa-east-1"
+  profile = terraform.workspace == "cliente" ? "cliente" : "default"
 }
