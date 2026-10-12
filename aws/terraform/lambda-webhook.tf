@@ -1,10 +1,3 @@
-# Mercado Pago can never supply x-amz-content-sha256, so it cannot go through
-# the OAC-gated Function URLs the rest of /api/* uses (see
-# CLOUDFRONT-OAC-LAMBDA-BODY-BUG.md). This Lambda gets its own public
-# Function URL instead, isolated from checkout/order-status/auth: its only
-# job is to verify Mercado Pago's own signature, re-fetch the payment from
-# Mercado Pago's API, and grant the entitlement. It has no access to
-# svod-users, svod-sessions, or anything playback-token touches.
 
 resource "aws_ssm_parameter" "mp_webhook_secret" {
   name  = "/serverless-vod/mp-webhook-secret"
@@ -51,8 +44,8 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = ["ssm:GetParameter"]
-        Effect   = "Allow"
+        Action = ["ssm:GetParameter"]
+        Effect = "Allow"
         Resource = [
           aws_ssm_parameter.mp_webhook_secret.arn,
           aws_ssm_parameter.mp_access_token.arn,
@@ -95,6 +88,7 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
 resource "aws_iam_role_policy_attachment" "webhook_lambda_logs" {
   role       = aws_iam_role.webhook_lambda_role.id
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
 }
 
 data "archive_file" "webhook_lambda_zip" {
@@ -108,6 +102,7 @@ resource "aws_lambda_function" "webhook" {
   role          = aws_iam_role.webhook_lambda_role.arn
   handler       = "index.handler"
   runtime       = "nodejs24.x"
+  timeout       = 10
 
   filename         = data.archive_file.webhook_lambda_zip.output_path
   source_code_hash = data.archive_file.webhook_lambda_zip.output_base64sha256
@@ -119,9 +114,7 @@ resource "aws_lambda_function" "webhook" {
   }
 }
 
-# Deliberately public: Mercado Pago cannot sign requests the way CloudFront's
-# OAC requires, so this Function URL skips CloudFront entirely. Security here
-# comes from mpVerify() inside the handler, not from AWS_IAM.
+
 resource "aws_lambda_function_url" "webhook_url" {
   function_name      = aws_lambda_function.webhook.function_name
   authorization_type = "NONE"
