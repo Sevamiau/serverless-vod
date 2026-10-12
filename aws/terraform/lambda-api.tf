@@ -123,7 +123,7 @@ resource "aws_lambda_permission" "allon_api" {
 resource "null_resource" "set_api_lambda_distribution_domain" {
   triggers = {
     lambda_distribution_domain = aws_cloudfront_distribution.distribution.domain_name
-    mp_webhook_url              = aws_lambda_function_url.webhook_url.function_url
+    mp_webhook_url             = aws_lambda_function_url.webhook_url.function_url
   }
   provisioner "local-exec" {
     command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
