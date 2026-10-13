@@ -93,11 +93,11 @@ async function logPlayEvent(userEmail, deviceHash, ip) {
 }
 
 
-function buildPolicy(host, ttlSeconds, sourceIp) {
+function buildPolicy(host, productId, ttlSeconds, sourceIp) {
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
   const policy = {
     Statement: [{
-      Resource: `https://${host}/movie/*`,
+      Resource: `https://${host}/movie/${productId}/*`,
       Condition: {
         DateLessThan: { "AWS:EpochTime": expires },
         IpAddress: { "AWS:SourceIp": `${sourceIp}/32` }
@@ -158,7 +158,7 @@ export const handler = async (event) => {
   const sourceIp = forwardedFor ? forwardedFor.split(',')[0].trim() : event.requestContext.http.sourceIp;
   await logPlayEvent(userEmail, deviceHash, sourceIp);
 
-  const policy = buildPolicy(host, 300, sourceIp);
+  const policy = buildPolicy(host, CFG.productId, 300, sourceIp);
   const privateKeyPem = await getPrivateKey();
   const signature = signPolicy(policy, privateKeyPem);
   const policyEncoded = cloudfrontSafeBase64(Buffer.from(policy).toString('base64'));
