@@ -26,8 +26,8 @@ echo "-> gracias.html"
 aws s3 cp ../site/gracias.html "s3://$SITE_BUCKET/gracias.html"
 
 if [ -d "$MEDIA_DIR" ]; then
-    echo "-> movie/ (from $MEDIA_DIR)"
-    aws s3 sync "$MEDIA_DIR/" "s3://$MOVIE_BUCKET/movie/"
+    echo "-> movie/film01/ (from $MEDIA_DIR)"
+    aws s3 sync "$MEDIA_DIR/" "s3://$MOVIE_BUCKET/movie/film01/"
 else
     echo "-> skipping movie/: $MEDIA_DIR not found (run make-media.sh first, or set MEDIA_DIR)"
 fi
