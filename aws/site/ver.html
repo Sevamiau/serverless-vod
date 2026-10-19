@@ -46,11 +46,9 @@
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
-  async function start() {
-    playBtn.disabled = true;
-    statusEl.textContent = '';
+  let refreshTimer = null;
 
-    log('POST /api/playback-token ...');
+  async function mintPlaybackToken() {
     const body = JSON.stringify({ deviceId: getDeviceId(), label: navigator.userAgent.slice(0, 40) });
     const res = await fetch('/api/playback-token', {
       method: 'POST',
@@ -60,12 +58,49 @@
     });
     if (!res.ok) {
       log(`mint failed: HTTP ${res.status}`);
+      return false;
+    }
+    log(`mint OK: HTTP ${res.status}`);
+    return true;
+  }
+
+  async function refreshPlaybackToken() {
+    const ok = await mintPlaybackToken();
+    if (!ok) {
+      log('refresh failed — stopping playback');
+      video.pause();
+      clearInterval(refreshTimer);
+    }
+  }
+
+  function startRefreshTimer() {
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(refreshPlaybackToken, 4 * 60 * 1000);
+  }
+
+  async function onResume() {
+    log('resuming — re-minting before continuing');
+    const ok = await mintPlaybackToken();
+    if (!ok) {
+      log('resume mint failed — stopping playback');
+      video.pause();
+      return;
+    }
+    startRefreshTimer();
+  }
+
+  async function start() {
+    playBtn.disabled = true;
+    statusEl.textContent = '';
+
+    log('POST /api/playback-token ...');
+    const ok = await mintPlaybackToken();
+    if (!ok) {
       playBtn.disabled = false;
       return;
     }
-    log(`mint OK: HTTP ${res.status}`);
 
-    const src = '/movie/film01/master.m3u8'; 
+    const src = '/movie/film01/master.m3u8';
 
     if (Hls.isSupported()) {
       log('using hls.js');
@@ -89,6 +124,12 @@
     } catch (err) {
       log(`video.play() rejected (${err.message}) — use the player controls`);
     }
+
+    startRefreshTimer();
+    video.addEventListener('pause', () => clearInterval(refreshTimer));
+    video.addEventListener('play', onResume);
+    video.addEventListener('ended', () => clearInterval(refreshTimer));
+
     playBtn.disabled = false;
   }
 
