@@ -138,23 +138,19 @@ async function handleOrderStatus(event) {
     return { statusCode: 200, body: JSON.stringify({ status: order.status }) };
   }
 
-  const sessionToken = randomBytes(32).toString('base64url');
-  const sessionHash = sha256(sessionToken);
-  await ddb.send(new PutCommand({
-    TableName: 'svod-sessions',
-    Item: { tokenHash: sessionHash, userEmail: order.userEmail, expiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600 },
-  }));
-
   return {
     statusCode: 200,
     body: JSON.stringify({ status: 'paid', traceCode: order.traceCode }),
-    cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax`],
   };
 }
 
 async function handleAuthRequest(event) {
   const body = JSON.parse(event.body || '{}');
-  const email = body.email;
+  const email = String(body.email || '').trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'bad-email' }) };
+  }
 
   const userResult = await ddb.send(new GetCommand({
     TableName: 'svod-users',
@@ -217,12 +213,20 @@ async function handleAuthCallback(event) {
     return { statusCode: 302, headers: { location: '/entrar.html?error=link' } };
   }
 
-  await ddb.send(new UpdateCommand({
-    TableName: 'svod-magic-links',
-    Key: { tokenHash },
-    UpdateExpression: 'SET usedAt = :now',
-    ExpressionAttributeValues: { ':now': now },
-  }));
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: 'svod-magic-links',
+      Key: { tokenHash },
+      UpdateExpression: 'SET usedAt = :now',
+      ConditionExpression: 'usedAt = :null',
+      ExpressionAttributeValues: { ':now': now, ':null': null },
+    }));
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      return { statusCode: 302, headers: { location: '/entrar.html?error=link' } };
+    }
+    throw err;
+  }
 
   const sessionToken = randomBytes(32).toString('base64url');
   const sessionHash = sha256(sessionToken);
