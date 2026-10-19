@@ -36,7 +36,7 @@ resource "aws_cloudfront_distribution" "distribution" {
   }
 
   enabled             = true
-  is_ipv6_enabled     = true
+  is_ipv6_enabled     = false
   comment             = "CloudFront distribution for site and movie buckets"
   default_root_object = "index.html"
 
