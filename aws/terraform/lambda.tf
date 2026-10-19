@@ -105,6 +105,7 @@ resource "aws_lambda_function" "playback_token" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "index.handler"
   runtime       = "nodejs24.x"
+  timeout       = 10
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256

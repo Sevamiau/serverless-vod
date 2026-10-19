@@ -97,6 +97,14 @@ export const handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ error: 'unknown-order' }) };
   }
 
+  const now = Math.floor(Date.now() / 1000);
+  await ddb.send(new UpdateCommand({
+    TableName: 'svod-entitlements',
+    Key: { userEmail: order.userEmail, productId: order.productId },
+    UpdateExpression: 'SET grantedAt = :now, traceCode = :tc REMOVE revokedAt',
+    ExpressionAttributeValues: { ':now': now, ':tc': order.traceCode },
+  }));
+
   try {
     await ddb.send(new UpdateCommand({
       TableName: 'svod-orders',
@@ -112,14 +120,6 @@ export const handler = async (event) => {
     }
     throw err;
   }
-
-  const now = Math.floor(Date.now() / 1000);
-  await ddb.send(new UpdateCommand({
-    TableName: 'svod-entitlements',
-    Key: { userEmail: order.userEmail, productId: order.productId },
-    UpdateExpression: 'SET grantedAt = :now, traceCode = :tc REMOVE revokedAt',
-    ExpressionAttributeValues: { ':now': now, ':tc': order.traceCode },
-  }));
 
 
   const token = randomBytes(24).toString('base64url');

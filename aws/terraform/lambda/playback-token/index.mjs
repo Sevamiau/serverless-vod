@@ -107,6 +107,14 @@ function buildPolicy(host, productId, ttlSeconds, sourceIp) {
   return JSON.stringify(policy);
 }
 
+function parseViewerIp(headerValue) {
+  if (!headerValue) return null;
+  const lastColon = headerValue.lastIndexOf(':');
+  let ip = headerValue.slice(0, lastColon);
+  if (ip.startsWith('[') && ip.endsWith(']')) ip = ip.slice(1, -1);
+  return ip;
+}
+
 function cloudfrontSafeBase64(str) {
   return str
     .replace(/\+/g, "-")
@@ -154,8 +162,7 @@ export const handler = async (event) => {
   await registerDevice(userEmail, deviceHash, body.label, existingDevice);
 
   const host = process.env.DISTRIBUTION_DOMAIN;
-  const forwardedFor = event.headers['x-forwarded-for'];
-  const sourceIp = forwardedFor ? forwardedFor.split(',')[0].trim() : event.requestContext.http.sourceIp;
+  const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
   await logPlayEvent(userEmail, deviceHash, sourceIp);
 
   const policy = buildPolicy(host, CFG.productId, 300, sourceIp);

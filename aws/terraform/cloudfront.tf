@@ -1,3 +1,23 @@
+resource "aws_cloudfront_origin_request_policy" "playback_token" {
+  name    = "playback-token-origin-request"
+  comment = "Forwards cookies + just the headers playback-token needs, excluding Host (breaks Lambda Function URL SigV4 auth via OAC)"
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      items = ["content-type", "CloudFront-Viewer-Address"]
+    }
+  }
+
+  query_strings_config {
+    query_string_behavior = "none"
+  }
+}
+
 resource "aws_cloudfront_distribution" "distribution" {
   origin {
     domain_name              = aws_s3_bucket.site_bucket.bucket_regional_domain_name
@@ -72,7 +92,7 @@ resource "aws_cloudfront_distribution" "distribution" {
     cached_methods           = ["GET", "HEAD"]
     target_origin_id         = "lambda-playback-token"
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.playback_token.id
 
     viewer_protocol_policy = "redirect-to-https"
   }
