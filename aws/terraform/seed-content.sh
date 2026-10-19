@@ -25,6 +25,9 @@ aws s3 cp ../site/comprar.html "s3://$SITE_BUCKET/comprar.html"
 echo "-> gracias.html"
 aws s3 cp ../site/gracias.html "s3://$SITE_BUCKET/gracias.html"
 
+echo "-> entrar.html"
+aws s3 cp ../site/entrar.html "s3://$SITE_BUCKET/entrar.html"
+
 if [ -d "$MEDIA_DIR" ]; then
     echo "-> movie/film01/ (from $MEDIA_DIR)"
     aws s3 sync "$MEDIA_DIR/" "s3://$MOVIE_BUCKET/movie/film01/"

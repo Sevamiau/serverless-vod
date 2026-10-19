@@ -58,6 +58,9 @@
     });
     if (!res.ok) {
       log(`mint failed: HTTP ${res.status}`);
+      if (res.status === 401) {
+        window.location.href = '/entrar.html';
+      }
       return false;
     }
     log(`mint OK: HTTP ${res.status}`);

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>serverless-vod &middot; entrar</title>
+<style>
+  body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; }
+  input { font: inherit; width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; margin-bottom: 12px; }
+  button { font: inherit; padding: 10px 18px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
+  #linkError { margin: 0 0 14px; padding: 10px 12px; border-radius: 6px; background: #3a2020; color: #e9a; display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Entrar</h1>
+  <p>Ingresá tu email y te mandamos un enlace para entrar, sin contraseña.</p>
+  <div id="linkError">El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
+  <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
+  <button id="send">Enviar enlace</button>
+  <div id="status"></div>
+</main>
+<script>
+  const statusEl = document.getElementById('status');
+  const sendBtn = document.getElementById('send');
+  const emailInput = document.getElementById('email');
+  const linkErrorEl = document.getElementById('linkError');
+
+  if (new URLSearchParams(window.location.search).get('error') === 'link') {
+    linkErrorEl.style.display = 'block';
+  }
+
+  function log(line) {
+    statusEl.textContent += line + '\n';
+  }
+
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function sendLink() {
+    const email = emailInput.value.trim();
+    if (!email) {
+      log('ingresá un email primero');
+      return;
+    }
+
+    sendBtn.disabled = true;
+    statusEl.textContent = '';
+    log('POST /api/auth/request ...');
+
+    const body = JSON.stringify({ email });
+    const res = await fetch('/api/auth/request', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
+      body,
+    });
+
+    if (!res.ok) {
+      log(`algo falló: HTTP ${res.status}`);
+      sendBtn.disabled = false;
+      return;
+    }
+
+    log('listo — si tu email está registrado, te mandamos un enlace. Revisá tu bandeja de entrada.');
+    sendBtn.disabled = false;
+  }
+
+  sendBtn.addEventListener('click', sendLink);
+</script>
+</body>
+</html>
