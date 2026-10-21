@@ -56,6 +56,11 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.sessions.arn
       },
       {
+        Action   = ["dynamodb:UpdateItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.rate_limits.arn
+      },
+      {
         Action   = ["ses:SendEmail"]
         Effect   = "Allow"
         Resource = aws_ses_email_identity.sender.arn

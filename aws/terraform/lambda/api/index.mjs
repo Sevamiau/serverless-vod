@@ -8,6 +8,31 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
 const ssm = new SSMClient({});
 
+function parseViewerIp(headerValue) {
+  if (!headerValue) return null;
+  const lastColon = headerValue.lastIndexOf(':');
+  let ip = headerValue.slice(0, lastColon);
+  if (ip.startsWith('[') && ip.endsWith(']')) ip = ip.slice(1, -1);
+  return ip;
+}
+
+async function checkRateLimit(key, limit, windowSeconds) {
+  const windowStart = Math.floor(Date.now() / 1000 / windowSeconds) * windowSeconds;
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: 'svod-rate-limits',
+      Key: { rateLimitKey: `${key}#${windowStart}` },
+      UpdateExpression: 'ADD requestCount :one SET expiresAt = if_not_exists(expiresAt, :exp)',
+      ConditionExpression: 'attribute_not_exists(requestCount) OR requestCount < :limit',
+      ExpressionAttributeValues: { ':one': 1, ':limit': limit, ':exp': windowStart + windowSeconds },
+    }));
+    return true;
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') return false;
+    throw err;
+  }
+}
+
 const CFG = {
   productId: 'film01',
   productTitle: 'La película',
@@ -85,6 +110,13 @@ async function handleCheckout(event) {
   const email = body.email ?? '';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'email inválido' }) };
+  }
+
+  const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
+  const emailOk = await checkRateLimit(`email:${email.toLowerCase()}`, 5, 60);
+  const ipOk = await checkRateLimit(`ip:${sourceIp}`, 10, 60);
+  if (!emailOk || !ipOk) {
+    return { statusCode: 429, body: JSON.stringify({ error: 'too-many-requests' }) };
   }
 
   const user = await upsertUser(email);

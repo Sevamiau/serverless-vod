@@ -119,3 +119,19 @@ resource "aws_dynamodb_table" "orders" {
     projection_type = "ALL"
   }
 }
+
+resource "aws_dynamodb_table" "rate_limits" {
+  name         = "svod-rate-limits"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "rateLimitKey"
+
+  attribute {
+    name = "rateLimitKey"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
+}
