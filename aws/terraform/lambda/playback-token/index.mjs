@@ -11,7 +11,7 @@ const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 const CFG = {
   productId: 'film01',
   deviceCap: 3,
-  concurrencyWindowSec: 60,
+  concurrencyWindowSec: 300, // longer than ver.html's 4-minute refresh interval, so an active viewer's heartbeat never goes stale
 };
 
 function getSessionToken(event) {
@@ -69,17 +69,18 @@ async function hasOtherActiveDevice(userEmail, deviceHash) {
 
 async function registerDevice(userEmail, deviceHash, label, existing) {
   const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + 90 * 24 * 3600;
   if (existing) {
     await ddb.send(new UpdateCommand({
       TableName: 'svod-devices',
       Key: { userEmail, deviceHash },
-      UpdateExpression: 'SET lastSeen = :now',
-      ExpressionAttributeValues: { ':now': now },
+      UpdateExpression: 'SET lastSeen = :now, expiresAt = :exp',
+      ExpressionAttributeValues: { ':now': now, ':exp': expiresAt },
     }));
   } else {
     await ddb.send(new PutCommand({
       TableName: 'svod-devices',
-      Item: { userEmail, deviceHash, label: (label || 'dispositivo').slice(0, 40), firstSeen: now, lastSeen: now },
+      Item: { userEmail, deviceHash, label: (label || 'dispositivo').slice(0, 40), firstSeen: now, lastSeen: now, expiresAt },
     }));
   }
 }

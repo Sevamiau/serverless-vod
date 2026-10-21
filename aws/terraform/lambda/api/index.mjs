@@ -184,6 +184,11 @@ async function handleAuthRequest(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'bad-email' }) };
   }
 
+  const withinLimit = await checkRateLimit(`authreq:${email}`, 1, 60);
+  if (!withinLimit) {
+    return { statusCode: 429, body: JSON.stringify({ error: 'too-many-requests' }) };
+  }
+
   const userResult = await ddb.send(new GetCommand({
     TableName: 'svod-users',
     Key: { email },
