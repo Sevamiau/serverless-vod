@@ -134,5 +134,9 @@ resource "null_resource" "set_lambda_distribution_domian" {
   }
   provisioner "local-exec" {
     command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},PUBLIC_KEY_ID=${aws_cloudfront_public_key.movie_key.id}}'"
+    environment = {
+      AWS_PROFILE = local.aws_profile
+      AWS_REGION  = local.aws_region
+    }
   }
 }

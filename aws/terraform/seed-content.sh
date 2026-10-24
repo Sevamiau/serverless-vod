@@ -5,9 +5,21 @@ cd "$(dirname "$0")"
 
 MEDIA_DIR="${MEDIA_DIR:-$HOME/work/peli/peli/media/movie}"
 
+# Same profile/region the provider uses for this workspace (providers.tf),
+# so uploads land in the account Terraform deployed to.
+WORKSPACE=$(terraform workspace show)
+if [ "$WORKSPACE" = "cliente" ]; then
+    export AWS_PROFILE=cliente
+else
+    export AWS_PROFILE=default
+fi
+export AWS_REGION=sa-east-1
+
 SITE_BUCKET=$(terraform output -raw site_bucket_name)
 MOVIE_BUCKET=$(terraform output -raw movie_bucket_name)
+DISTRIBUTION_ID=$(terraform output -raw distribution_id)
 
+echo "Workspace:    $WORKSPACE (profile $AWS_PROFILE)"
 echo "Site bucket:  $SITE_BUCKET"
 echo "Movie bucket: $MOVIE_BUCKET"
 echo
@@ -34,6 +46,10 @@ if [ -d "$MEDIA_DIR" ]; then
 else
     echo "-> skipping movie/: $MEDIA_DIR not found (run make-media.sh first, or set MEDIA_DIR)"
 fi
+
+# CloudFront caches pages for up to 24h; without this you may keep testing the old ones.
+echo "-> invalidating CloudFront cache"
+aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' --query 'Invalidation.Id' --output text
 
 echo
 echo "done"

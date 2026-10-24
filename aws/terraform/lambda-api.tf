@@ -132,5 +132,9 @@ resource "null_resource" "set_api_lambda_distribution_domain" {
   }
   provisioner "local-exec" {
     command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
+    environment = {
+      AWS_PROFILE = local.aws_profile
+      AWS_REGION  = local.aws_region
+    }
   }
 }

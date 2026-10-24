@@ -9,7 +9,14 @@ terraform {
   }
 }
 
+# Shared with the local-exec provisioners: the aws CLI they run doesn't see
+# this provider's profile/region and would otherwise use the shell's defaults.
+locals {
+  aws_profile = terraform.workspace == "cliente" ? "cliente" : "default"
+  aws_region  = "sa-east-1"
+}
+
 provider "aws" {
-  region  = "sa-east-1"
-  profile = terraform.workspace == "cliente" ? "cliente" : "default"
+  region  = local.aws_region
+  profile = local.aws_profile
 }
