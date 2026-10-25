@@ -148,10 +148,26 @@ async function handleCheckout(event) {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+async function orderStatusById(orderId) {
+  if (!UUID_RE.test(orderId)) {
+    return { statusCode: 200, body: JSON.stringify({ status: 'unknown', reason: 'no-claim-cookie' }) };
+  }
+  const result = await ddb.send(new GetCommand({
+    TableName: 'svod-orders',
+    Key: { orderId },
+  }));
+  if (!result.Item) {
+    return { statusCode: 200, body: JSON.stringify({ status: 'unknown', reason: 'no-such-order' }) };
+  }
+  return { statusCode: 200, body: JSON.stringify({ status: result.Item.status }) };
+}
+
 async function handleOrderStatus(event) {
   const claimCookie = (event.cookies || []).find((c) => c.startsWith('poc_claim='));
   if (!claimCookie) {
-    return { statusCode: 200, body: JSON.stringify({ status: 'unknown', reason: 'no-claim-cookie' }) };
+    return orderStatusById(event.queryStringParameters?.order_id ?? '');
   }
   const claim = claimCookie.slice('poc_claim='.length);
 
@@ -184,8 +200,10 @@ async function handleAuthRequest(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'bad-email' }) };
   }
 
-  const withinLimit = await checkRateLimit(`authreq:${email}`, 1, 60);
-  if (!withinLimit) {
+  const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
+  const ipOk = await checkRateLimit(`authreq-ip:${sourceIp}`, 5, 60);
+  const emailOk = await checkRateLimit(`authreq:${email}`, 1, 60);
+  if (!ipOk || !emailOk) {
     return { statusCode: 429, body: JSON.stringify({ error: 'too-many-requests' }) };
   }
 

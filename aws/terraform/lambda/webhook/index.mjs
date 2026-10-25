@@ -126,7 +126,7 @@ export const handler = async (event) => {
   const tokenHash = sha256(token);
   await ddb.send(new PutCommand({
     TableName: 'svod-magic-links',
-    Item: { tokenHash, userEmail: order.userEmail, expiresAt: now + 15 * 60, usedAt: null },
+    Item: { tokenHash, userEmail: order.userEmail, expiresAt: now + 72 * 3600, usedAt: null },
   }));
 
   const link = `https://${process.env.DISTRIBUTION_DOMAIN}/api/auth/callback?token=${token}`;

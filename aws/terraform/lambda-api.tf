@@ -36,7 +36,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.users.arn
       },
       {
-        Action   = ["dynamodb:putItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:GetItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.orders.arn
       },

@@ -41,21 +41,28 @@
 
  
   async function poll(attempt = 0) {
-    const res = await fetch('/api/order-status', { credentials: 'include' });
+    const orderId = params.get('order_id') || '';
+    const res = await fetch(`/api/order-status?order_id=${encodeURIComponent(orderId)}`, { credentials: 'include' });
     const data = await res.json();
     log(`[${attempt}] status: ${data.status}${data.reason ? ' (' + data.reason + ')' : ''}`);
 
     if (data.status === 'paid') {
       titleEl.textContent = '¡Gracias por tu compra!';
-      messageEl.textContent = 'Tu código de copia:';
-      traceEl.textContent = data.traceCode;
+      if (data.traceCode) {
+        messageEl.textContent = 'Tu código de copia:';
+        traceEl.textContent = data.traceCode;
+      } else {
+        messageEl.textContent = 'El pago está confirmado. Tu código de copia está en el email.';
+      }
       watchLinkEl.style.display = 'block';
       return;
     }
 
     if (data.status === 'unknown') {
-      titleEl.textContent = 'No encontramos tu orden';
-      messageEl.textContent = 'Probá iniciar la compra de nuevo desde /comprar.';
+      titleEl.textContent = 'No encontramos tu orden en este navegador';
+      messageEl.innerHTML = 'Si ya pagaste, <strong>no vuelvas a pagar</strong>: revisá tu email, te mandamos un enlace para entrar. '
+        + 'Si no te llegó, pedí uno nuevo en <a href="/entrar.html">entrar</a>. '
+        + 'Si todavía no pagaste, podés empezar la compra en <a href="/comprar.html">comprar</a>.';
       return;
     }
 
