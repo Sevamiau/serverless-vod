@@ -116,6 +116,10 @@ export const handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ ok: true, revoked: payment.status }) };
   }
 
+  if (order.emailedAt) {
+    return { statusCode: 200, body: JSON.stringify({ ok: true, idempotent: true }) };
+  }
+
   const now = Math.floor(Date.now() / 1000);
   await ddb.send(new UpdateCommand({
     TableName: 'svod-entitlements',
@@ -134,12 +138,8 @@ export const handler = async (event) => {
       ExpressionAttributeValues: { ':paid': 'paid', ':ref': `mp:${payment.id}` },
     }));
   } catch (err) {
-    if (err.name === 'ConditionalCheckFailedException') {
-      return { statusCode: 200, body: JSON.stringify({ ok: true, idempotent: true }) };
-    }
-    throw err;
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
   }
-
 
   const token = randomBytes(24).toString('base64url');
   const tokenHash = sha256(token);
@@ -160,6 +160,13 @@ export const handler = async (event) => {
         },
       },
     },
+  }));
+
+  await ddb.send(new UpdateCommand({
+    TableName: 'svod-orders',
+    Key: { orderId },
+    UpdateExpression: 'SET emailedAt = :now',
+    ExpressionAttributeValues: { ':now': now },
   }));
 
   return { statusCode: 200, body: JSON.stringify({ ok: true }) };
