@@ -120,6 +120,22 @@ resource "aws_lambda_function_url" "webhook_url" {
   authorization_type = "NONE"
 }
 
+resource "aws_lambda_permission" "webhook_url_public" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.webhook.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "webhook_invoke_function" {
+  statement_id             = "FunctionURLAllowInvokeAction"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.webhook.function_name
+  principal                = "*"
+  invoked_via_function_url = true
+}
+
 output "mercadopago_webhook_url" {
   value = aws_lambda_function_url.webhook_url.function_url
 }
