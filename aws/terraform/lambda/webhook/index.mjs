@@ -83,10 +83,6 @@ export const handler = async (event) => {
   }
   const payment = await paymentRes.json();
 
-  if (payment.status !== 'approved') {
-    return { statusCode: 200, body: JSON.stringify({ ignored: payment.status }) };
-  }
-
   const orderId = payment.external_reference;
   const orderResult = await ddb.send(new GetCommand({
     TableName: 'svod-orders',
@@ -95,6 +91,29 @@ export const handler = async (event) => {
   const order = orderResult.Item;
   if (!order) {
     return { statusCode: 200, body: JSON.stringify({ error: 'unknown-order' }) };
+  }
+
+  const REVOKING_STATUSES = new Set(['refunded', 'cancelled', 'charged_back']);
+  if (payment.status !== 'approved') {
+    if (!REVOKING_STATUSES.has(payment.status)) {
+      return { statusCode: 200, body: JSON.stringify({ ignored: payment.status }) };
+    }
+
+    await ddb.send(new UpdateCommand({
+      TableName: 'svod-entitlements',
+      Key: { userEmail: order.userEmail, productId: order.productId },
+      UpdateExpression: 'SET revokedAt = :now',
+      ExpressionAttributeValues: { ':now': Math.floor(Date.now() / 1000) },
+    }));
+    await ddb.send(new UpdateCommand({
+      TableName: 'svod-orders',
+      Key: { orderId },
+      UpdateExpression: 'SET #s = :status',
+      ExpressionAttributeNames: { '#s': 'status' },
+      ExpressionAttributeValues: { ':status': payment.status },
+    }));
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true, revoked: payment.status }) };
   }
 
   const now = Math.floor(Date.now() / 1000);
