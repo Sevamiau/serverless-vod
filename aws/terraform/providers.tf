@@ -7,6 +7,15 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket       = "serverless-vod-tfstate-950672314674"
+    key          = "serverless-vod/terraform.tfstate"
+    region       = "sa-east-1"
+    profile      = "default"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 locals {
