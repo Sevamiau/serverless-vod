@@ -41,7 +41,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.orders.arn
       },
       {
-        Action   = ["dynamodb:UpdateItem", "dynamodb:Query"]
+        Action   = ["dynamodb:Query"]
         Effect   = "Allow"
         Resource = "${aws_dynamodb_table.orders.arn}/index/claim-index"
       },

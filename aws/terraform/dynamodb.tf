@@ -53,7 +53,7 @@ resource "aws_dynamodb_table" "devices" {
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "userEmail"
   range_key    = "deviceHash"
-  
+
   ttl {
     attribute_name = "expiresAt"
     enabled        = true

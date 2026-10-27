@@ -175,9 +175,9 @@ export const handler = async (event) => {
   return {
     statusCode: 200,
     cookies: [
-      `CloudFront-Policy=${policyEncoded}; Path=/; Secure`,
-      `CloudFront-Signature=${signatureEncoded}; Path=/; Secure`,
-      `CloudFront-Key-Pair-Id=${process.env.PUBLIC_KEY_ID}; Path=/; Secure`,
+      `CloudFront-Policy=${policyEncoded}; Path=/; Secure; HttpOnly`,
+      `CloudFront-Signature=${signatureEncoded}; Path=/; Secure; HttpOnly`,
+      `CloudFront-Key-Pair-Id=${process.env.PUBLIC_KEY_ID}; Path=/; Secure; HttpOnly`,
     ],
     body: JSON.stringify({
       ok: true,

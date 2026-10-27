@@ -124,7 +124,7 @@ export const handler = async (event) => {
   await ddb.send(new UpdateCommand({
     TableName: 'svod-entitlements',
     Key: { userEmail: order.userEmail, productId: order.productId },
-    UpdateExpression: 'SET grantedAt = :now, traceCode = :tc REMOVE revokedAt',
+    UpdateExpression: 'SET grantedAt = :now, traceCode = if_not_exists(traceCode, :tc) REMOVE revokedAt',
     ExpressionAttributeValues: { ':now': now, ':tc': order.traceCode },
   }));
 
