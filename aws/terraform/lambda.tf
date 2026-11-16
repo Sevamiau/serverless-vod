@@ -87,7 +87,6 @@ resource "aws_lambda_permission" "allow_function_url_invoke_function" {
   function_name = aws_lambda_function.playback_token.function_name
   principal     = "cloudfront.amazonaws.com"
   source_arn    = aws_cloudfront_distribution.distribution.arn
-  # function_url_auth_type  = "AWS_IAM" ---> Check why "lambda:InovkeFunction" does not support function_url_auth_type
 }
 
 data "aws_kms_alias" "ssm_default" {
@@ -131,7 +130,6 @@ resource "aws_cloudfront_origin_access_control" "lambda_oac" {
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
 }
-
 
 resource "null_resource" "set_lambda_distribution_domian" {
   triggers = {

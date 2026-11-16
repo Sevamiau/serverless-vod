@@ -3,13 +3,10 @@ resource "aws_s3_bucket" "site_bucket" {
   force_destroy = true
 }
 
-# Re-uploading the film is slow and the bucket name changes on recreate, so
-# a protected workspace refuses to destroy it while it still has content.
 resource "aws_s3_bucket" "movie_bucket" {
   bucket_prefix = "movie-bucket-"
   force_destroy = !local.settings.protect_data
 }
-
 
 resource "aws_s3_bucket_public_access_block" "site" {
   bucket = aws_s3_bucket.site_bucket.id
@@ -28,7 +25,6 @@ resource "aws_s3_bucket_public_access_block" "movie" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-
 
 resource "aws_s3_bucket_policy" "site" {
   bucket = aws_s3_bucket.site_bucket.id

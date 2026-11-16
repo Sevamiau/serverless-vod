@@ -1,18 +1,13 @@
-# Everything the custom domain needs. All of it is created as soon as
-# `domain` is set in settings.tf, but stays inert until `serve_on_domain`.
 
 resource "aws_route53_zone" "site" {
   count = local.has_domain ? 1 : 0
   name  = local.zone_name
 
-  # Recreating the zone assigns new nameservers, which would take the site and
-  # its email offline until the registrar is updated again.
   lifecycle {
     prevent_destroy = true
   }
 }
 
-# CloudFront only accepts certificates from us-east-1.
 resource "aws_acm_certificate" "site" {
   count                     = local.has_domain ? 1 : 0
   provider                  = aws.us_east_1
@@ -42,9 +37,7 @@ resource "aws_route53_record" "cert_validation" {
   allow_overwrite = true
 }
 
-# Waits until ACM sees the records above, which only happens once the
-# registrar delegates to the zone's nameservers. That's why it's gated on
-# serve_on_domain and not on has_domain.
+# waits until the registrar points at the zone
 resource "aws_acm_certificate_validation" "site" {
   count                   = local.serve_on_domain ? 1 : 0
   provider                = aws.us_east_1
@@ -52,8 +45,7 @@ resource "aws_acm_certificate_validation" "site" {
   validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
 
-# A records only: the distribution has IPv6 disabled because the signed
-# cookie's IP condition assumes IPv4, so there's no AAAA on purpose.
+# no AAAA: IPv6 is off on the distribution
 resource "aws_route53_record" "site" {
   for_each = local.serve_on_domain ? toset([local.zone_name, "www.${local.zone_name}"]) : toset([])
 
@@ -67,10 +59,6 @@ resource "aws_route53_record" "site" {
     evaluate_target_health = false
   }
 }
-
-# --- Email: SES domain identity, DKIM, custom MAIL FROM, SPF, DMARC ---------
-# With these in place, mail from no-reply@<domain> passes DMARC, which mail
-# sent from a @gmail.com address through SES never can.
 
 resource "aws_ses_domain_identity" "site" {
   count  = local.has_domain ? 1 : 0
@@ -124,8 +112,6 @@ resource "aws_route53_record" "ses_mail_from_spf" {
   records = ["v=spf1 include:amazonses.com ~all"]
 }
 
-# p=none only reports; tighten to quarantine once a few weeks of mail have
-# gone out cleanly.
 resource "aws_route53_record" "dmarc" {
   count   = local.has_domain ? 1 : 0
   zone_id = aws_route53_zone.site[0].zone_id

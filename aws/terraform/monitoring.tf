@@ -8,7 +8,6 @@ locals {
   }
 }
 
-
 resource "aws_cloudwatch_log_group" "lambda" {
   for_each          = toset(["api", "playback_token", "mercadopago_webhook"])
   name              = "/serverless-vod/lambda/${each.key}"
@@ -42,7 +41,6 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   ok_actions          = [aws_sns_topic.alerts.arn]
 }
 
-
 resource "aws_cloudwatch_log_metric_filter" "webhook_problems" {
   for_each = {
     bad_signature   = "\"MP webhook REJECTED\" \"bad-signature\""
@@ -75,7 +73,6 @@ resource "aws_cloudwatch_metric_alarm" "webhook_problems" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
 }
-
 
 resource "aws_cloudwatch_metric_alarm" "ses_reputation" {
   for_each = {

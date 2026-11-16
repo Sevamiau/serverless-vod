@@ -22,21 +22,9 @@ echo "Site bucket:  $SITE_BUCKET"
 echo "Movie bucket: $MOVIE_BUCKET"
 echo
 
-echo "-> index.html"
-echo "hello from serverless-vod" >/tmp/index.html
-aws s3 cp /tmp/index.html "s3://$SITE_BUCKET/index.html"
-
-echo "-> ver.html"
-aws s3 cp ../site/ver.html "s3://$SITE_BUCKET/ver.html"
-
-echo "-> comprar.html"
-aws s3 cp ../site/comprar.html "s3://$SITE_BUCKET/comprar.html"
-
-echo "-> gracias.html"
-aws s3 cp ../site/gracias.html "s3://$SITE_BUCKET/gracias.html"
-
-echo "-> entrar.html"
-aws s3 cp ../site/entrar.html "s3://$SITE_BUCKET/entrar.html"
+echo "-> site (../site/)"
+aws s3 sync ../site/ "s3://$SITE_BUCKET/" --delete --exclude "*.woff2"
+aws s3 sync ../site/ "s3://$SITE_BUCKET/" --exclude "*" --include "*.woff2" --content-type font/woff2
 
 if [ -d "$MEDIA_DIR" ]; then
     echo "-> movie/film01/ (from $MEDIA_DIR)"

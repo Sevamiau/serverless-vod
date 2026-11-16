@@ -1,28 +1,75 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>serverless-vod &middot; entrar</title>
-<style>
-  body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
-  main { max-width: 480px; margin: 0 auto; }
-  input { font: inherit; width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #eee; margin-bottom: 12px; }
-  button { font: inherit; padding: 10px 18px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
-  #linkError { margin: 0 0 14px; padding: 10px 12px; border-radius: 6px; background: #3a2020; color: #e9a; display: none; }
-</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrar — Mi Proyecto</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<main>
-  <h1>Entrar</h1>
-  <p>Ingresá tu email y te mandamos un enlace para entrar, sin contraseña.</p>
-  <div id="linkError">El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
-  <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
-  <button id="send">Enviar enlace</button>
-  <div id="status"></div>
-</main>
+<body class="page--dark">
+    <header class="header js-header">
+        <div class="header__container container">
+            <a href="index.html" class="header__logo js-header-logo" aria-label="Inicio">
+                <span class="header__logo-mark"></span>
+                <span class="header__logo-text">mi proyecto</span>
+            </a>
+
+            <div class="header__right-container">
+                <nav class="header__navigation">
+                    <a href="entrar.html" class="header__auth-link">Entrar</a>
+                </nav>
+
+                <button type="button" class="hamburger-menu js-hamburger-menu" aria-label="Abrir menú" aria-expanded="false">
+                    <div></div><div></div><div></div>
+                </button>
+
+                <div class="header__menu-container js-header-menu-container">
+                    <nav class="header__menu">
+                        <a href="sobre.html">Sobre el proyecto</a>
+                        <a href="faqs.html">Preguntas frecuentes</a>
+                        <a href="contacto.html">Contacto</a>
+                        <div class="header__menu-auth-mobile">
+                            <a href="entrar.html" class="header__auth-link">Entrar</a>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-page">
+        <div class="app-page__main">
+            <h1 class="app-page__title">Entrar</h1>
+            <p class="app-page__lead">Ingresá el email con el que compraste y te mandamos un enlace para entrar, sin contraseña.</p>
+            <div id="linkError" class="notice error" hidden>El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
+            <div class="app-form">
+                <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
+                <button id="send" class="button button--white">Enviar enlace</button>
+            </div>
+            <div id="status" class="app-status"></div>
+            <p class="app-page__small">¿Todavía no la tenés? <a href="comprar.html">Comprala acá</a>.</p>
+        </div>
+    </main>
+
+    <footer class="footer footer--static">
+        <div class="footer__container container">
+            <div class="footer__social-container">
+                <a href="https://instagram.com/" target="_blank" rel="noopener" aria-label="Instagram">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="2.5" width="19" height="19" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/></svg>
+                </a>
+                <a href="https://youtube.com/" target="_blank" rel="noopener" aria-label="YouTube">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.8a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.7 15.1V8.9l5.8 3.1-5.8 3.1z"/></svg>
+                </a>
+            </div>
+            <nav class="footer__legal" aria-label="Legales">
+                <a href="terminos.html">Términos</a>
+                <a href="privacidad.html">Privacidad</a>
+                <a href="arrepentimiento.html">Botón de arrepentimiento</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script src="main.js"></script>
 <script>
   const statusEl = document.getElementById('status');
   const sendBtn = document.getElementById('send');
@@ -30,7 +77,7 @@
   const linkErrorEl = document.getElementById('linkError');
 
   if (new URLSearchParams(window.location.search).get('error') === 'link') {
-    linkErrorEl.style.display = 'block';
+    linkErrorEl.hidden = false;
   }
 
   function log(line) {

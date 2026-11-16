@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contacto — Mi Proyecto</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page--dark">
+    <header class="header js-header">
+        <div class="header__container container">
+            <a href="index.html" class="header__logo js-header-logo" aria-label="Inicio">
+                <span class="header__logo-mark"></span>
+                <span class="header__logo-text">mi proyecto</span>
+            </a>
+
+            <div class="header__right-container">
+                <nav class="header__navigation">
+                    <a href="entrar.html" class="header__auth-link">Entrar</a>
+                </nav>
+
+                <button type="button" class="hamburger-menu js-hamburger-menu" aria-label="Abrir menú" aria-expanded="false">
+                    <div></div><div></div><div></div>
+                </button>
+
+                <div class="header__menu-container js-header-menu-container">
+                    <nav class="header__menu">
+                        <a href="sobre.html">Sobre el proyecto</a>
+                        <a href="faqs.html">Preguntas frecuentes</a>
+                        <a href="contacto.html">Contacto</a>
+                        <div class="header__menu-auth-mobile">
+                            <a href="entrar.html" class="header__auth-link">Entrar</a>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="contact">
+        <div class="contact__main container-sm">
+            <div class="contact__top-container">
+                <div class="contact__column">
+                    <p class="contact__label">CONTACTO</p>
+                    <a href="mailto:hola@miproyecto.com" class="contact__value">hola@miproyecto.com</a>
+                </div>
+                <div class="contact__column">
+                    <p class="contact__label">LOCACIÓN</p>
+                    <p class="contact__value">Ciudad, País</p>
+                </div>
+                <div class="contact__column">
+                    <p class="contact__label">REDES</p>
+                    <div class="contact__social-media">
+                        <a href="https://instagram.com/" class="contact__value" target="_blank" rel="noopener">Instagram</a>
+                        <a href="https://youtube.com/" class="contact__value" target="_blank" rel="noopener">YouTube</a>
+                        <a href="https://linkedin.com/" class="contact__value" target="_blank" rel="noopener">LinkedIn</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="contact__brand" aria-hidden="true">mi proyecto</p>
+    </main>
+
+    <footer class="footer footer--static">
+        <div class="footer__container container">
+            <div class="footer__social-container">
+                <a href="https://instagram.com/" target="_blank" rel="noopener" aria-label="Instagram">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="2.5" width="19" height="19" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/></svg>
+                </a>
+                <a href="https://youtube.com/" target="_blank" rel="noopener" aria-label="YouTube">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.8a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.7 15.1V8.9l5.8 3.1-5.8 3.1z"/></svg>
+                </a>
+            </div>
+            <nav class="footer__legal" aria-label="Legales">
+                <a href="terminos.html">Términos</a>
+                <a href="privacidad.html">Privacidad</a>
+                <a href="arrepentimiento.html">Botón de arrepentimiento</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script src="main.js"></script>
+</body>
+</html>

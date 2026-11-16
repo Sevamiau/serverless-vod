@@ -38,10 +38,6 @@ resource "aws_cloudfront_origin_request_policy" "api" {
   }
 }
 
-# One policy for every behavior. The CSP allows inline scripts and styles
-# because every page has them; it still limits scripts to this site and the
-# pinned hls.js on jsdelivr, data to this site, and blocks framing. blob: is
-# for hls.js, which plays through a MediaSource and runs a worker.
 resource "aws_cloudfront_response_headers_policy" "security" {
   name = "svod-security-headers"
 
@@ -69,8 +65,6 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       frame_option = "DENY"
       override     = true
     }
-    # Same-origin requests still send the full Referer, which the
-    # referer-lock function on /movie/* depends on.
     referrer_policy {
       referrer_policy = "strict-origin-when-cross-origin"
       override        = true
@@ -177,7 +171,6 @@ resource "aws_cloudfront_distribution" "distribution" {
     viewer_protocol_policy     = "redirect-to-https"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
-
 
   price_class = "PriceClass_100"
 

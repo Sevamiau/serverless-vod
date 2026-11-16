@@ -10,8 +10,6 @@ const ses = new SESClient({});
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
-// Function URLs base64-encode bodies whose content type isn't text, and a
-// body that isn't a JSON object is a client error, not a crash.
 function parseJsonBody(event) {
   if (!event.body) return {};
   try {
@@ -48,8 +46,7 @@ async function getAccessToken() {
   return cachedAccessToken;
 }
 
-// Mercado Pago's spec: leave out any part that isn't in the notification,
-// and lowercase an alphanumeric data.id.
+// per MP docs: omit missing parts, lowercase data.id
 function mpManifest({ id, requestId, ts }) {
   let manifest = '';
   if (id) manifest += `id:${String(id).toLowerCase()};`;
@@ -86,10 +83,7 @@ export const handler = async (event) => {
   const headers = event.headers || {};
   const query = event.queryStringParameters || {};
 
-  // The preference's notification_url gets both the signed Webhooks format
-  // (?type=payment&data.id=...) and the older IPN format (?topic=...&id=...),
-  // including merchant_order topics. Only signed payment notifications are
-  // acted on; acknowledging the rest stops Mercado Pago from retrying them.
+  // ack IPN and non-payment topics so MP stops retrying
   const type = query.type ?? body.type;
   if (query.topic || type !== 'payment') {
     console.log('MP webhook ignored:', query.topic ?? type ?? 'no-type');
@@ -116,6 +110,7 @@ export const handler = async (event) => {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!paymentRes.ok) {
+    console.error('MP payment lookup failed:', paymentRes.status, paymentId);
     return { statusCode: 400, body: JSON.stringify({ error: 'payment-not-found-upstream' }) };
   }
   const payment = await paymentRes.json();
@@ -156,9 +151,6 @@ export const handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ ok: true, revoked: payment.status }) };
   }
 
-  // The order's price is set server-side at checkout; a payment for a
-  // different amount or currency doesn't buy the film. Logged as an error so
-  // it shows up in the alarms, and acknowledged so Mercado Pago stops retrying.
   if (Number(payment.transaction_amount) !== Number(order.amount) || payment.currency_id !== order.currency) {
     console.error('MP payment does not match order', {
       orderId,

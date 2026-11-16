@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, DeleteCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -50,7 +50,6 @@ async function getMpAccessToken() {
   return cachedMpAccessToken;
 }
 
-
 async function createMpPreference({ orderId, email }) {
   const accessToken = await getMpAccessToken();
   const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -86,8 +85,6 @@ export function traceCode() {
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
-// Function URLs base64-encode bodies whose content type isn't text, and a
-// body that isn't a JSON object is a client error, not a crash.
 function parseJsonBody(event) {
   if (!event.body) return {};
   try {
@@ -108,6 +105,21 @@ function getCookie(event, name) {
 }
 
 const SESSION_MAX_AGE = 30 * 24 * 3600;
+const DEVICE_REMOVAL_INTERVAL = 30 * 24 * 3600;
+
+const NO_SESSION = { statusCode: 401, body: JSON.stringify({ error: 'no-session' }) };
+
+async function getSessionEmail(event) {
+  const token = getCookie(event, 'poc_session');
+  if (!token) return null;
+  const result = await ddb.send(new GetCommand({
+    TableName: 'svod-sessions',
+    Key: { tokenHash: sha256(token) },
+  }));
+  const session = result.Item;
+  if (!session || session.expiresAt < Math.floor(Date.now() / 1000)) return null;
+  return session.userEmail;
+}
 
 async function upsertUser(email) {
   const normalized = email.trim().toLowerCase();
@@ -269,14 +281,14 @@ export const handler = async (event) => {
     'POST /api/checkout': handleCheckout,
     'GET /api/order-status': handleOrderStatus,
     'POST /api/auth/logout': handleLogout,
+    'GET /api/devices': handleListDevices,
+    'POST /api/devices/remove': handleRemoveDevice,
   };
 
   const fn = routes[`${method} ${path}`];
   if (!fn) return { statusCode: 404, body: JSON.stringify({ error: 'not found' }) };
   return fn(event);
 };
-
-
 
 async function handleAuthCallback(event) {
   const token = event.queryStringParameters?.token ?? '';
@@ -322,8 +334,6 @@ async function handleAuthCallback(event) {
   };
 }
 
-// Deletes the session server-side, so the cookie is dead even if the browser
-// keeps it, and clears it along with the playback cookies.
 async function handleLogout(event) {
   const sessionToken = getCookie(event, 'poc_session');
   if (sessionToken) {
@@ -340,4 +350,75 @@ async function handleLogout(event) {
     cookies: ['poc_session', 'CloudFront-Policy', 'CloudFront-Signature', 'CloudFront-Key-Pair-Id']
       .map((name) => `${name}=; ${expired}`),
   };
+}
+
+async function handleListDevices(event) {
+  const userEmail = await getSessionEmail(event);
+  if (!userEmail) return NO_SESSION;
+
+  const [devices, user] = await Promise.all([
+    ddb.send(new QueryCommand({
+      TableName: 'svod-devices',
+      KeyConditionExpression: 'userEmail = :e',
+      ExpressionAttributeValues: { ':e': userEmail },
+    })),
+    ddb.send(new GetCommand({ TableName: 'svod-users', Key: { email: userEmail } })),
+  ]);
+  const lastRemoval = user.Item?.lastDeviceRemovalAt;
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      devices: (devices.Items || []).map(({ deviceHash, label, lastSeen }) => ({ deviceHash, label, lastSeen })),
+      nextRemovalAt: lastRemoval ? lastRemoval + DEVICE_REMOVAL_INTERVAL : null,
+    }),
+  };
+}
+
+async function handleRemoveDevice(event) {
+  const userEmail = await getSessionEmail(event);
+  if (!userEmail) return NO_SESSION;
+
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
+  const deviceHash = typeof body.deviceHash === 'string' ? body.deviceHash : '';
+  if (!/^[0-9a-f]{64}$/.test(deviceHash)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'bad-device' }) };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    await ddb.send(new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: 'svod-users',
+            Key: { email: userEmail },
+            UpdateExpression: 'SET lastDeviceRemovalAt = :now',
+            ConditionExpression: 'attribute_not_exists(lastDeviceRemovalAt) OR lastDeviceRemovalAt <= :cutoff',
+            ExpressionAttributeValues: { ':now': now, ':cutoff': now - DEVICE_REMOVAL_INTERVAL },
+          },
+        },
+        {
+          Delete: {
+            TableName: 'svod-devices',
+            Key: { userEmail, deviceHash },
+            ConditionExpression: 'attribute_exists(deviceHash)',
+          },
+        },
+      ],
+    }));
+  } catch (err) {
+    if (err.name !== 'TransactionCanceledException') throw err;
+    const [userReason, deviceReason] = (err.CancellationReasons || []).map((r) => r.Code);
+    if (deviceReason === 'ConditionalCheckFailed') {
+      return { statusCode: 404, body: JSON.stringify({ error: 'no-such-device' }) };
+    }
+    if (userReason === 'ConditionalCheckFailed') {
+      return { statusCode: 429, body: JSON.stringify({ error: 'removal-limit' }) };
+    }
+    throw err;
+  }
+
+  return { statusCode: 200, body: JSON.stringify({ ok: true }) };
 }

@@ -10,7 +10,6 @@ resource "aws_iam_role" "api_lambda_role" {
         Principal = {
           Service = "lambda.amazonaws.com"
 
-
         }
       },
 
@@ -31,7 +30,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.users.arn
       },
       {
-        Action   = ["dynamodb:PutItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.users.arn
       },
@@ -51,9 +50,14 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.magic_links.arn
       },
       {
-        Action   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:GetItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.sessions.arn
+      },
+      {
+        Action   = ["dynamodb:Query", "dynamodb:DeleteItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.devices.arn
       },
       {
         Action   = ["dynamodb:UpdateItem"]

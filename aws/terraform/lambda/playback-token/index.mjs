@@ -8,8 +8,6 @@ const ssm = new SSMClient({});
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
-// Function URLs base64-encode bodies whose content type isn't text, and a
-// body that isn't a JSON object is a client error, not a crash.
 function parseJsonBody(event) {
   if (!event.body) return {};
   try {
@@ -26,7 +24,7 @@ const BAD_BODY = { statusCode: 400, body: JSON.stringify({ error: 'bad-body' }) 
 const CFG = {
   productId: 'film01',
   deviceCap: 3,
-  concurrencyWindowSec: 300, // longer than ver.html's 4-minute refresh interval, so an active viewer's heartbeat never goes stale
+  concurrencyWindowSec: 300, // > ver.html's 4 min refresh
 };
 
 function getSessionToken(event) {
@@ -107,7 +105,6 @@ async function logPlayEvent(userEmail, deviceHash, ip) {
     Item: { userEmail, createdAt: now, deviceHash, ip, expiresAt: now + 24 * 3600 },
   }));
 }
-
 
 function buildPolicy(host, productId, ttlSeconds, sourceIp) {
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
