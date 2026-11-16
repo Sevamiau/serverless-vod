@@ -51,7 +51,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.magic_links.arn
       },
       {
-        Action   = ["dynamodb:PutItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.sessions.arn
       },

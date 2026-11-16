@@ -1,35 +1,84 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>serverless-vod &middot; playback check</title>
+<title>serverless-vod &middot; ver</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js"></script>
 <style>
   body { margin: 0; padding: 40px 20px; background: #111; color: #eee; font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
   main { max-width: 720px; margin: 0 auto; }
+  a { color: #4da3ff; }
   video { width: 100%; background: #000; border-radius: 6px; }
-  button { font: inherit; padding: 10px 18px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
+  button { font: inherit; padding: 10px 18px; margin-bottom: 14px; border: 0; border-radius: 6px; background: #4da3ff; color: #111; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
-  #status { margin: 14px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #9aa; white-space: pre-wrap; }
+  button.secondary { background: none; color: #9aa; border: 1px solid #333; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #message { margin: 0 0 14px; padding: 10px 12px; border-radius: 6px; }
+  #message:empty { display: none; }
+  #message.warn { background: #3a3320; color: #ec9; }
+  #message.error { background: #3a2020; color: #e9a; }
+  details { margin-top: 14px; color: #9aa; font-size: 13px; }
+  #status { font-family: 'SFMono-Regular', Consolas, monospace; white-space: pre-wrap; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Step 6 playback check</h1>
-  <p>Mints a real playback cookie via <code>/api/playback-token</code>, then loads <code>/movie/master.m3u8</code> with it &mdash; the same path curl has been exercising, now through an actual player.</p>
-  <button id="play">Play</button>
-  <div id="status"></div>
-  <video id="video" controls></video>
+  <header>
+    <h1>La película</h1>
+    <button id="logout" class="secondary">Salir</button>
+  </header>
+  <button id="play">Ver</button>
+  <div id="message" role="status" aria-live="polite"></div>
+  <video id="video" controls playsinline></video>
+  <details>
+    <summary>Detalles técnicos</summary>
+    <div id="status"></div>
+  </details>
 </main>
 <script>
+  const SRC = '/movie/film01/master.m3u8';
+  const REFRESH_MS = 4 * 60 * 1000;    // the cookie lasts 5 minutes
+  const RETRY_REFRESH_MS = 15 * 1000;  // 3 retries still land inside that last minute
+  const MAX_REFRESH_RETRIES = 3;
+  const MAX_RECOVERY_ATTEMPTS = 4;     // backoff 1s, 2s, 4s, 8s
+  const MAX_FATAL_STREAK = 3;          // fatal errors with no fragment loaded in between
+
   const statusEl = document.getElementById('status');
+  const messageEl = document.getElementById('message');
   const video = document.getElementById('video');
   const playBtn = document.getElementById('play');
+
+  let hls = null;
+  let playerReady = false;
+  let loadingStopped = false;
+  let refreshTimer = null;
+  let refreshRetries = 0;
+  let lastMintAt = 0;
+  let recovering = false;
+  let fatalStreak = 0;
 
   function log(line) {
     statusEl.textContent += line + '\n';
   }
+
+  function showMessage(text, kind = 'error', link) {
+    messageEl.className = kind;
+    messageEl.textContent = text;
+    if (link) {
+      const a = document.createElement('a');
+      a.href = link.href;
+      a.textContent = link.text;
+      messageEl.append(' ', a);
+    }
+  }
+
+  function clearMessage() {
+    messageEl.className = '';
+    messageEl.textContent = '';
+  }
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   function getDeviceId() {
     let id = localStorage.getItem('deviceId');
@@ -40,86 +89,198 @@
     return id;
   }
 
-
   async function sha256Hex(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
-  let refreshTimer = null;
+  // Why the server refused, in words a buyer can act on.
+  function explainBlocked(data) {
+    switch (data.error) {
+      case 'no-entitlement':
+        showMessage('Tu cuenta no tiene acceso a esta película.', 'error', { href: '/comprar.html', text: 'Comprarla' });
+        break;
+      case 'device-cap':
+        showMessage(`Tu cuenta ya tiene ${data.devices} dispositivos registrados, el máximo es ${data.cap}. ` +
+          'Este dispositivo no es uno de ellos. Los dispositivos que no usás durante 90 días se liberan solos.');
+        break;
+      case 'concurrency':
+        showMessage('La película se está viendo en otro dispositivo. Cerrala ahí y volvé a darle play en unos minutos.');
+        break;
+      default:
+        showMessage('No tenés permiso para ver la película en este momento.');
+    }
+  }
 
+  // { ok } on success. On failure, `transient` says whether trying again
+  // later can help (network, throttling, 5xx); otherwise the reason has
+  // already been shown to the user.
   async function mintPlaybackToken() {
     const body = JSON.stringify({ deviceId: getDeviceId(), label: navigator.userAgent.slice(0, 40) });
-    const res = await fetch('/api/playback-token', {
-      method: 'POST',
-      credentials: 'include', // the whole point: cookies must land on this origin so /movie/* can read them back
-      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
-      body,
-    });
-    if (!res.ok) {
-      log(`mint failed: HTTP ${res.status}`);
-      if (res.status === 401) {
-        window.location.href = '/entrar.html';
-      }
-      return false;
+    let res;
+    try {
+      res = await fetch('/api/playback-token', {
+        method: 'POST',
+        credentials: 'include', // the whole point: cookies must land on this origin so /movie/* can read them back
+        headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
+        body,
+      });
+    } catch (err) {
+      log(`mint failed: ${err.message}`);
+      return { ok: false, transient: true };
     }
-    log(`mint OK: HTTP ${res.status}`);
-    return true;
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      lastMintAt = Date.now();
+      log(`mint OK: HTTP ${res.status}`);
+      return { ok: true };
+    }
+
+    log(`mint failed: HTTP ${res.status} ${data.error ?? ''}`);
+    if (res.status === 401) {
+      window.location.href = '/entrar.html';
+      return { ok: false, transient: false };
+    }
+    if (res.status === 403) {
+      explainBlocked(data);
+      return { ok: false, transient: false };
+    }
+    return { ok: false, transient: true };
+  }
+
+  function stopPlayback() {
+    clearTimeout(refreshTimer);
+    video.pause();
+    if (hls) hls.stopLoad();
+    loadingStopped = true;
+  }
+
+  function restartLoading() {
+    loadingStopped = false;
+    if (hls) {
+      hls.startLoad();
+      return;
+    }
+    // Native HLS (Safari) has no startLoad: reload the source where it was.
+    const at = video.currentTime;
+    video.src = SRC;
+    video.currentTime = at;
+    video.play().catch(() => {});
+  }
+
+  function scheduleRefresh(ms = REFRESH_MS) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refreshPlaybackToken, ms);
   }
 
   async function refreshPlaybackToken() {
-    const ok = await mintPlaybackToken();
-    if (!ok) {
-      log('refresh failed — stopping playback');
-      video.pause();
-      clearInterval(refreshTimer);
-    }
-  }
-
-  function startRefreshTimer() {
-    clearInterval(refreshTimer);
-    refreshTimer = setInterval(refreshPlaybackToken, 4 * 60 * 1000);
-  }
-
-  async function onResume() {
-    log('resuming — re-minting before continuing');
-    const ok = await mintPlaybackToken();
-    if (!ok) {
-      log('resume mint failed — stopping playback');
-      video.pause();
+    const r = await mintPlaybackToken();
+    if (r.ok) {
+      refreshRetries = 0;
+      if (messageEl.className === 'warn') clearMessage();
+      scheduleRefresh();
       return;
     }
-    startRefreshTimer();
-  }
-
-  async function start() {
-    playBtn.disabled = true;
-    statusEl.textContent = '';
-
-    log('POST /api/playback-token ...');
-    const ok = await mintPlaybackToken();
-    if (!ok) {
-      playBtn.disabled = false;
+    if (r.transient && ++refreshRetries <= MAX_REFRESH_RETRIES) {
+      showMessage('Problema de conexión, reintentando…', 'warn');
+      scheduleRefresh(RETRY_REFRESH_MS);
       return;
     }
+    if (r.transient) {
+      showMessage('Se perdió la conexión. Revisá tu internet y volvé a darle play.');
+    }
+    stopPlayback();
+  }
 
-    const src = '/movie/film01/master.m3u8';
+  // Segments started failing (expired cookie after a long pause, an IP change
+  // from Wi-Fi to mobile data, a dropped connection): get a fresh cookie for
+  // the current IP, then pick up loading where it stopped.
+  async function recoverNetwork() {
+    if (recovering) return;
+    recovering = true;
+    try {
+      if (++fatalStreak > MAX_FATAL_STREAK) {
+        showMessage('No pudimos seguir reproduciendo la película. Recargá la página para intentar de nuevo.');
+        stopPlayback();
+        return;
+      }
+      for (let attempt = 1; attempt <= MAX_RECOVERY_ATTEMPTS; attempt++) {
+        showMessage('Reconectando…', 'warn');
+        await sleep(1000 * 2 ** (attempt - 1));
+        const r = await mintPlaybackToken();
+        if (r.ok) {
+          clearMessage();
+          scheduleRefresh();
+          restartLoading();
+          return;
+        }
+        if (!r.transient) {
+          stopPlayback();
+          return;
+        }
+      }
+      showMessage('Se perdió la conexión. Revisá tu internet y volvé a darle play.');
+      stopPlayback();
+    } finally {
+      recovering = false;
+    }
+  }
 
+  function setUpPlayer() {
     if (Hls.isSupported()) {
       log('using hls.js');
-      const hls = new Hls();
-      hls.on(Hls.Events.ERROR, (_evt, data) => log(`hls.js error: ${data.type} / ${data.details}`));
-      hls.loadSource(src);
+      hls = new Hls();
+      hls.on(Hls.Events.FRAG_LOADED, () => { fatalStreak = 0; });
+      hls.on(Hls.Events.ERROR, (_evt, data) => {
+        log(`hls.js error: ${data.type} / ${data.details}${data.fatal ? ' (fatal)' : ''}`);
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          recoverNetwork();
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && ++fatalStreak <= MAX_FATAL_STREAK) {
+          hls.recoverMediaError();
+        } else {
+          showMessage('No pudimos seguir reproduciendo la película. Recargá la página para intentar de nuevo.');
+          stopPlayback();
+        }
+      });
+      hls.loadSource(SRC);
       hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari plays HLS natively; hls.js explicitly refuses to run there instead of double-handling it.
       log('native HLS support (Safari) — skipping hls.js');
-      video.src = src;
+      video.addEventListener('timeupdate', () => { fatalStreak = 0; });
+      video.addEventListener('error', () => {
+        log(`video error: code ${video.error?.code}`);
+        recoverNetwork();
+      });
+      video.src = SRC;
     } else {
-      log('no HLS support in this browser');
+      return false;
+    }
+    playerReady = true;
+    return true;
+  }
+
+  async function start() {
+    playBtn.disabled = true;
+    clearMessage();
+    log('POST /api/playback-token ...');
+
+    const r = await mintPlaybackToken();
+    if (!r.ok) {
+      if (r.transient) showMessage('No pudimos conectar. Probá de nuevo en un momento.');
       playBtn.disabled = false;
       return;
     }
+
+    if (!setUpPlayer()) {
+      showMessage('Este navegador no puede reproducir la película. Probá con Chrome, Firefox o Safari actualizados.');
+      playBtn.disabled = false;
+      return;
+    }
+    playBtn.hidden = true;
+    scheduleRefresh();
 
     try {
       await video.play();
@@ -127,16 +288,49 @@
     } catch (err) {
       log(`video.play() rejected (${err.message}) — use the player controls`);
     }
-
-    startRefreshTimer();
-    video.addEventListener('pause', () => clearInterval(refreshTimer));
-    video.addEventListener('play', onResume);
-    video.addEventListener('ended', () => clearInterval(refreshTimer));
-
-    playBtn.disabled = false;
   }
 
+  // Pausing stops the refresh, so the other-device check frees up after a
+  // few minutes. Resuming re-mints first unless the cookie is still fresh.
+  async function onResume() {
+    if (!playerReady || recovering) return;
+    const age = Date.now() - lastMintAt;
+    if (age < 60 * 1000 && !loadingStopped) {
+      scheduleRefresh(REFRESH_MS - age);
+      return;
+    }
+
+    log('resuming — re-minting before continuing');
+    const r = await mintPlaybackToken();
+    if (!r.ok) {
+      if (r.transient) showMessage('No pudimos conectar. Probá de nuevo en un momento.');
+      video.pause();
+      return;
+    }
+    clearMessage();
+    refreshRetries = 0;
+    scheduleRefresh();
+    if (loadingStopped) restartLoading();
+  }
+
+  video.addEventListener('play', onResume);
+  video.addEventListener('pause', () => clearTimeout(refreshTimer));
+  video.addEventListener('ended', () => clearTimeout(refreshTimer));
   playBtn.addEventListener('click', start);
+
+  document.getElementById('logout').addEventListener('click', async () => {
+    stopPlayback();
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'x-amz-content-sha256': await sha256Hex('') },
+      });
+    } catch (err) {
+      log(`logout failed: ${err.message}`);
+    }
+    window.location.href = '/entrar.html';
+  });
 </script>
 </body>
 </html>

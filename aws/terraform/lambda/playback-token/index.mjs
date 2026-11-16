@@ -8,6 +8,21 @@ const ssm = new SSMClient({});
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+// Function URLs base64-encode bodies whose content type isn't text, and a
+// body that isn't a JSON object is a client error, not a crash.
+function parseJsonBody(event) {
+  if (!event.body) return {};
+  try {
+    const raw = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const BAD_BODY = { statusCode: 400, body: JSON.stringify({ error: 'bad-body' }) };
+
 const CFG = {
   productId: 'film01',
   deviceCap: 3,
@@ -139,7 +154,8 @@ async function getPrivateKey() {
 }
 
 export const handler = async (event) => {
-  const body = JSON.parse(event.body || '{}');
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
 
   const userEmail = await getUserEmail(event);
   if (!userEmail) return { statusCode: 401, body: JSON.stringify({ error: 'no-session' }) };

@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -86,6 +86,29 @@ export function traceCode() {
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+// Function URLs base64-encode bodies whose content type isn't text, and a
+// body that isn't a JSON object is a client error, not a crash.
+function parseJsonBody(event) {
+  if (!event.body) return {};
+  try {
+    const raw = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const BAD_BODY = { statusCode: 400, body: JSON.stringify({ error: 'bad-body' }) };
+
+function getCookie(event, name) {
+  const prefix = `${name}=`;
+  const cookie = (event.cookies || []).find((c) => c.startsWith(prefix));
+  return cookie ? cookie.slice(prefix.length) : null;
+}
+
+const SESSION_MAX_AGE = 30 * 24 * 3600;
+
 async function upsertUser(email) {
   const normalized = email.trim().toLowerCase();
 
@@ -106,8 +129,9 @@ async function upsertUser(email) {
 }
 
 async function handleCheckout(event) {
-  const body = JSON.parse(event.body || '{}');
-  const email = body.email ?? '';
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'email inválido' }) };
   }
@@ -165,11 +189,10 @@ async function orderStatusById(orderId) {
 }
 
 async function handleOrderStatus(event) {
-  const claimCookie = (event.cookies || []).find((c) => c.startsWith('poc_claim='));
-  if (!claimCookie) {
+  const claim = getCookie(event, 'poc_claim');
+  if (!claim) {
     return orderStatusById(event.queryStringParameters?.order_id ?? '');
   }
-  const claim = claimCookie.slice('poc_claim='.length);
 
   const orderResult = await ddb.send(new QueryCommand({
     TableName: 'svod-orders',
@@ -193,8 +216,9 @@ async function handleOrderStatus(event) {
 }
 
 async function handleAuthRequest(event) {
-  const body = JSON.parse(event.body || '{}');
-  const email = String(body.email || '').trim().toLowerCase();
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'bad-email' }) };
@@ -244,6 +268,7 @@ export const handler = async (event) => {
     'GET /api/auth/callback': handleAuthCallback,
     'POST /api/checkout': handleCheckout,
     'GET /api/order-status': handleOrderStatus,
+    'POST /api/auth/logout': handleLogout,
   };
 
   const fn = routes[`${method} ${path}`];
@@ -287,12 +312,32 @@ async function handleAuthCallback(event) {
   const sessionHash = sha256(sessionToken);
   await ddb.send(new PutCommand({
     TableName: 'svod-sessions',
-    Item: { tokenHash: sessionHash, userEmail: link.userEmail, expiresAt: now + 30 * 24 * 3600 },
+    Item: { tokenHash: sessionHash, userEmail: link.userEmail, expiresAt: now + SESSION_MAX_AGE },
   }));
 
   return {
     statusCode: 302,
     headers: { location: '/ver.html' },
-    cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax`],
+    cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`],
+  };
+}
+
+// Deletes the session server-side, so the cookie is dead even if the browser
+// keeps it, and clears it along with the playback cookies.
+async function handleLogout(event) {
+  const sessionToken = getCookie(event, 'poc_session');
+  if (sessionToken) {
+    await ddb.send(new DeleteCommand({
+      TableName: 'svod-sessions',
+      Key: { tokenHash: sha256(sessionToken) },
+    }));
+  }
+
+  const expired = 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ ok: true }),
+    cookies: ['poc_session', 'CloudFront-Policy', 'CloudFront-Signature', 'CloudFront-Key-Pair-Id']
+      .map((name) => `${name}=; ${expired}`),
   };
 }

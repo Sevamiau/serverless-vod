@@ -10,6 +10,21 @@ const ses = new SESClient({});
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+// Function URLs base64-encode bodies whose content type isn't text, and a
+// body that isn't a JSON object is a client error, not a crash.
+function parseJsonBody(event) {
+  if (!event.body) return {};
+  try {
+    const raw = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const BAD_BODY = { statusCode: 400, body: JSON.stringify({ error: 'bad-body' }) };
+
 let cachedSecret;
 let cachedAccessToken;
 
@@ -33,8 +48,14 @@ async function getAccessToken() {
   return cachedAccessToken;
 }
 
+// Mercado Pago's spec: leave out any part that isn't in the notification,
+// and lowercase an alphanumeric data.id.
 function mpManifest({ id, requestId, ts }) {
-  return `id:${id};request-id:${requestId};ts:${ts};`;
+  let manifest = '';
+  if (id) manifest += `id:${String(id).toLowerCase()};`;
+  if (requestId) manifest += `request-id:${requestId};`;
+  manifest += `ts:${ts};`;
+  return manifest;
 }
 
 async function mpVerify({ header, id, requestId }) {
@@ -60,9 +81,25 @@ async function mpVerify({ header, id, requestId }) {
 }
 
 export const handler = async (event) => {
-  const body = JSON.parse(event.body || '{}');
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
   const headers = event.headers || {};
-  const paymentId = event.queryStringParameters?.['data.id'] ?? body?.data?.id;
+  const query = event.queryStringParameters || {};
+
+  // The preference's notification_url gets both the signed Webhooks format
+  // (?type=payment&data.id=...) and the older IPN format (?topic=...&id=...),
+  // including merchant_order topics. Only signed payment notifications are
+  // acted on; acknowledging the rest stops Mercado Pago from retrying them.
+  const type = query.type ?? body.type;
+  if (query.topic || type !== 'payment') {
+    console.log('MP webhook ignored:', query.topic ?? type ?? 'no-type');
+    return { statusCode: 200, body: JSON.stringify({ ignored: query.topic ?? type ?? 'no-type' }) };
+  }
+
+  const paymentId = query['data.id'] ?? body.data?.id;
+  if (!paymentId) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'missing-payment-id' }) };
+  }
 
   const v = await mpVerify({
     header: headers['x-signature'],
@@ -84,6 +121,9 @@ export const handler = async (event) => {
   const payment = await paymentRes.json();
 
   const orderId = payment.external_reference;
+  if (!orderId) {
+    return { statusCode: 200, body: JSON.stringify({ error: 'no-external-reference' }) };
+  }
   const orderResult = await ddb.send(new GetCommand({
     TableName: 'svod-orders',
     Key: { orderId },
@@ -114,6 +154,26 @@ export const handler = async (event) => {
     }));
 
     return { statusCode: 200, body: JSON.stringify({ ok: true, revoked: payment.status }) };
+  }
+
+  // The order's price is set server-side at checkout; a payment for a
+  // different amount or currency doesn't buy the film. Logged as an error so
+  // it shows up in the alarms, and acknowledged so Mercado Pago stops retrying.
+  if (Number(payment.transaction_amount) !== Number(order.amount) || payment.currency_id !== order.currency) {
+    console.error('MP payment does not match order', {
+      orderId,
+      paymentId: payment.id,
+      paid: `${payment.transaction_amount} ${payment.currency_id}`,
+      expected: `${order.amount} ${order.currency}`,
+    });
+    await ddb.send(new UpdateCommand({
+      TableName: 'svod-orders',
+      Key: { orderId },
+      UpdateExpression: 'SET #s = :status, providerRef = :ref',
+      ExpressionAttributeNames: { '#s': 'status' },
+      ExpressionAttributeValues: { ':status': 'amount-mismatch', ':ref': `mp:${payment.id}` },
+    }));
+    return { statusCode: 200, body: JSON.stringify({ error: 'amount-mismatch' }) };
   }
 
   if (order.emailedAt) {
