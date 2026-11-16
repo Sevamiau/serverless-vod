@@ -104,6 +104,11 @@ resource "aws_lambda_function" "webhook" {
   runtime       = "nodejs24.x"
   timeout       = 10
 
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.lambda["mercadopago_webhook"].name
+  }
+
   filename         = data.archive_file.webhook_lambda_zip.output_path
   source_code_hash = data.archive_file.webhook_lambda_zip.output_base64sha256
 

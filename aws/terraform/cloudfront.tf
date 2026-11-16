@@ -38,6 +38,51 @@ resource "aws_cloudfront_origin_request_policy" "api" {
   }
 }
 
+# One policy for every behavior. The CSP allows inline scripts and styles
+# because every page has them; it still limits scripts to this site and the
+# pinned hls.js on jsdelivr, data to this site, and blocks framing. blob: is
+# for hls.js, which plays through a MediaSource and runs a worker.
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "svod-security-headers"
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = join("; ", [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline'",
+        "media-src 'self' blob:",
+        "worker-src 'self' blob:",
+        "connect-src 'self'",
+        "img-src 'self' data:",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+      ])
+      override = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    # Same-origin requests still send the full Referer, which the
+    # referer-lock function on /movie/* depends on.
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = false
+      override                   = true
+    }
+  }
+}
+
 resource "aws_cloudfront_distribution" "distribution" {
   origin {
     domain_name              = aws_s3_bucket.site_bucket.bucket_regional_domain_name
@@ -88,7 +133,8 @@ resource "aws_cloudfront_distribution" "distribution" {
 
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" #instead of forwaded rules
 
-    viewer_protocol_policy = "redirect-to-https"
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   ordered_cache_behavior {
@@ -98,8 +144,9 @@ resource "aws_cloudfront_distribution" "distribution" {
     target_origin_id = "s3-movie-bucket"
     cache_policy_id  = "658327ea-f89d-4fab-a63d-7e88639e58f6"
 
-    viewer_protocol_policy = "redirect-to-https"
-    trusted_key_groups     = [aws_cloudfront_key_group.movie_key_group.id]
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    trusted_key_groups         = [aws_cloudfront_key_group.movie_key_group.id]
 
     function_association {
       event_type   = "viewer-request"
@@ -115,7 +162,8 @@ resource "aws_cloudfront_distribution" "distribution" {
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
     origin_request_policy_id = aws_cloudfront_origin_request_policy.playback_token.id
 
-    viewer_protocol_policy = "redirect-to-https"
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   ordered_cache_behavior {
@@ -126,7 +174,8 @@ resource "aws_cloudfront_distribution" "distribution" {
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
     origin_request_policy_id = aws_cloudfront_origin_request_policy.api.id
 
-    viewer_protocol_policy = "redirect-to-https"
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
 

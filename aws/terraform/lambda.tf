@@ -107,6 +107,11 @@ resource "aws_lambda_function" "playback_token" {
   runtime       = "nodejs24.x"
   timeout       = 10
 
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.lambda["playback_token"].name
+  }
+
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 

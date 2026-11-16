@@ -97,6 +97,11 @@ resource "aws_lambda_function" "api" {
   runtime       = "nodejs24.x"
   timeout       = 10
 
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.lambda["api"].name
+  }
+
   filename         = data.archive_file.api_lambda_zip.output_path
   source_code_hash = data.archive_file.api_lambda_zip.output_base64sha256
 

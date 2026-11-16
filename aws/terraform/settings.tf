@@ -18,11 +18,13 @@ locals {
       domain          = ""
       serve_on_domain = false
       protect_data    = false
+      alert_email     = "sevakunjadas.bms@gmail.com"
     }
     cliente = {
       domain          = ""
       serve_on_domain = false
       protect_data    = true
+      alert_email     = "sevakunjadas.bms@gmail.com"
     }
   }
 
