@@ -77,6 +77,7 @@ resource "aws_cloudfront_distribution" "distribution" {
 
   enabled             = true
   is_ipv6_enabled     = false
+  aliases             = local.serve_on_domain ? [local.domain, "www.${local.domain}"] : []
   comment             = "CloudFront distribution for site and movie buckets"
   default_root_object = "index.html"
 
@@ -138,7 +139,10 @@ resource "aws_cloudfront_distribution" "distribution" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = !local.serve_on_domain
+    acm_certificate_arn            = local.serve_on_domain ? aws_acm_certificate_validation.site[0].certificate_arn : null
+    ssl_support_method             = local.serve_on_domain ? "sni-only" : null
+    minimum_protocol_version       = local.serve_on_domain ? "TLSv1.2_2021" : null
   }
 }
 

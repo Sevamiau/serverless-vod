@@ -27,3 +27,10 @@ provider "aws" {
   region  = local.aws_region
   profile = local.aws_profile
 }
+
+# For the CloudFront certificate, which ACM only accepts from us-east-1.
+provider "aws" {
+  alias   = "us_east_1"
+  region  = "us-east-1"
+  profile = local.aws_profile
+}

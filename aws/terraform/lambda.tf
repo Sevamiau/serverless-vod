@@ -130,10 +130,11 @@ resource "aws_cloudfront_origin_access_control" "lambda_oac" {
 
 resource "null_resource" "set_lambda_distribution_domian" {
   triggers = {
-    lambda_distribution_domain = aws_cloudfront_distribution.distribution.domain_name
+    site_domain   = local.site_domain
+    public_key_id = aws_cloudfront_public_key.movie_key.id
   }
   provisioner "local-exec" {
-    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},PUBLIC_KEY_ID=${aws_cloudfront_public_key.movie_key.id}}'"
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={SITE_DOMAIN=${local.site_domain},PUBLIC_KEY_ID=${aws_cloudfront_public_key.movie_key.id}}'"
     environment = {
       AWS_PROFILE = local.aws_profile
       AWS_REGION  = local.aws_region

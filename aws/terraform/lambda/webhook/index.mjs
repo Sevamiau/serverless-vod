@@ -148,9 +148,9 @@ export const handler = async (event) => {
     Item: { tokenHash, userEmail: order.userEmail, expiresAt: now + 72 * 3600, usedAt: null },
   }));
 
-  const link = `https://${process.env.DISTRIBUTION_DOMAIN}/api/auth/callback?token=${token}`;
+  const link = `https://${process.env.SITE_DOMAIN}/api/auth/callback?token=${token}`;
   await ses.send(new SendEmailCommand({
-    Source: 'sevakunjadas.bms@gmail.com',
+    Source: process.env.SENDER_EMAIL,
     Destination: { ToAddresses: [order.userEmail] },
     Message: {
       Subject: { Data: 'Tu acceso a la película' },

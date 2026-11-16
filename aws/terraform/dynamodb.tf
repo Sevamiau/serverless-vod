@@ -37,6 +37,15 @@ resource "aws_dynamodb_table" "entitlements" {
   hash_key     = "userEmail"
   range_key    = "productId"
 
+  # Money records: point-in-time recovery everywhere, and deletion protection
+  # where real buyers exist (settings.tf), so a destroy fails instead of
+  # wiping who paid for what.
+  deletion_protection_enabled = local.settings.protect_data
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
   attribute {
     name = "userEmail"
     type = "S"
@@ -97,6 +106,15 @@ resource "aws_dynamodb_table" "users" {
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
 
+  # Money records: point-in-time recovery everywhere, and deletion protection
+  # where real buyers exist (settings.tf), so a destroy fails instead of
+  # wiping who paid for what.
+  deletion_protection_enabled = local.settings.protect_data
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
   attribute {
     name = "email"
     type = "S"
@@ -107,6 +125,15 @@ resource "aws_dynamodb_table" "orders" {
   name         = "svod-orders"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "orderId"
+
+  # Money records: point-in-time recovery everywhere, and deletion protection
+  # where real buyers exist (settings.tf), so a destroy fails instead of
+  # wiping who paid for what.
+  deletion_protection_enabled = local.settings.protect_data
+
+  point_in_time_recovery {
+    enabled = true
+  }
 
   attribute {
     name = "orderId"

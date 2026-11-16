@@ -79,7 +79,7 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
       {
         Action   = ["ses:SendEmail"]
         Effect   = "Allow"
-        Resource = aws_ses_email_identity.sender.arn
+        Resource = local.ses_identity_arns
       },
     ]
   })
@@ -109,7 +109,8 @@ resource "aws_lambda_function" "webhook" {
 
   environment {
     variables = {
-      DISTRIBUTION_DOMAIN = aws_cloudfront_distribution.distribution.domain_name
+      SITE_DOMAIN  = local.site_domain
+      SENDER_EMAIL = local.sender_email
     }
   }
 }

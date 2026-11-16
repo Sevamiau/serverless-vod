@@ -162,7 +162,7 @@ export const handler = async (event) => {
 
   await registerDevice(userEmail, deviceHash, body.label, existingDevice);
 
-  const host = process.env.DISTRIBUTION_DOMAIN;
+  const host = process.env.SITE_DOMAIN;
   const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
   await logPlayEvent(userEmail, deviceHash, sourceIp);
 

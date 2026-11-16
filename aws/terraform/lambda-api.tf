@@ -63,7 +63,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
       {
         Action   = ["ses:SendEmail"]
         Effect   = "Allow"
-        Resource = aws_ses_email_identity.sender.arn
+        Resource = local.ses_identity_arns
       },
       {
         Action   = ["ssm:GetParameter"]
@@ -127,11 +127,12 @@ resource "aws_lambda_permission" "allon_api" {
 
 resource "null_resource" "set_api_lambda_distribution_domain" {
   triggers = {
-    lambda_distribution_domain = aws_cloudfront_distribution.distribution.domain_name
-    mp_webhook_url             = aws_lambda_function_url.webhook_url.function_url
+    site_domain    = local.site_domain
+    sender_email   = local.sender_email
+    mp_webhook_url = aws_lambda_function_url.webhook_url.function_url
   }
   provisioner "local-exec" {
-    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={DISTRIBUTION_DOMAIN=${aws_cloudfront_distribution.distribution.domain_name},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={SITE_DOMAIN=${local.site_domain},SENDER_EMAIL=${local.sender_email},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
     environment = {
       AWS_PROFILE = local.aws_profile
       AWS_REGION  = local.aws_region

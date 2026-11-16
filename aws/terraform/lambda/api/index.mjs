@@ -67,8 +67,8 @@ async function createMpPreference({ orderId, email }) {
       external_reference: orderId,
       notification_url: process.env.MP_WEBHOOK_URL,
       back_urls: {
-        success: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias.html?order_id=${orderId}`,
-        failure: `https://${process.env.DISTRIBUTION_DOMAIN}/gracias.html?order_id=${orderId}&status=failure`,
+        success: `https://${process.env.SITE_DOMAIN}/gracias.html?order_id=${orderId}`,
+        failure: `https://${process.env.SITE_DOMAIN}/gracias.html?order_id=${orderId}&status=failure`,
       },
       auto_return: 'approved',
     }),
@@ -222,9 +222,9 @@ async function handleAuthRequest(event) {
       Item: { tokenHash, userEmail: email, expiresAt, usedAt: null },
     }));
 
-    const link = `https://${process.env.DISTRIBUTION_DOMAIN}/api/auth/callback?token=${token}`;
+    const link = `https://${process.env.SITE_DOMAIN}/api/auth/callback?token=${token}`;
     await ses.send(new SendEmailCommand({
-      Source: 'sevakunjadas.bms@gmail.com',
+      Source: process.env.SENDER_EMAIL,
       Destination: { ToAddresses: [email] },
       Message: {
         Subject: { Data: 'Tu enlace de acceso' },
