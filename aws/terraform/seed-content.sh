@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-MEDIA_DIR="${MEDIA_DIR:-$HOME/work/peli/peli/media/movie}"
+MEDIA_DIR="${MEDIA_DIR:-../media/movie}"
 
 WORKSPACE=$(terraform workspace show)
 if [ "$WORKSPACE" = "cliente" ]; then
@@ -22,15 +22,30 @@ echo "Site bucket:  $SITE_BUCKET"
 echo "Movie bucket: $MOVIE_BUCKET"
 echo
 
+REVALIDATE="no-cache"
+YEAR="public, max-age=31536000, immutable"
+DAY="public, max-age=86400"
+
+# cp, not sync: sync skips unchanged files, which would keep their old headers
 echo "-> site (../site/)"
-aws s3 sync ../site/ "s3://$SITE_BUCKET/" --delete --exclude "*.woff2"
-aws s3 sync ../site/ "s3://$SITE_BUCKET/" --exclude "*" --include "*.woff2" --content-type font/woff2
+aws s3 cp ../site/ "s3://$SITE_BUCKET/" --recursive --only-show-errors \
+    --exclude "*.woff2" --cache-control "$REVALIDATE"
+aws s3 cp ../site/ "s3://$SITE_BUCKET/" --recursive --only-show-errors \
+    --exclude "*" --include "*.woff2" --content-type font/woff2 --cache-control "$YEAR"
+aws s3 sync ../site/ "s3://$SITE_BUCKET/" --delete --only-show-errors
 
 if [ -d "$MEDIA_DIR" ]; then
     echo "-> movie/film01/ (from $MEDIA_DIR)"
-    aws s3 sync "$MEDIA_DIR/" "s3://$MOVIE_BUCKET/movie/film01/"
+    DEST="s3://$MOVIE_BUCKET/movie/film01/"
+    # segments keep their names across re-encodes, so not a year
+    aws s3 sync "$MEDIA_DIR/" "$DEST" --only-show-errors \
+        --exclude "*.m3u8" --exclude "*.vtt" --cache-control "$DAY"
+    aws s3 cp "$MEDIA_DIR/" "$DEST" --recursive --only-show-errors \
+        --exclude "*" --include "*.m3u8" --content-type application/vnd.apple.mpegurl --cache-control "$REVALIDATE"
+    aws s3 cp "$MEDIA_DIR/" "$DEST" --recursive --only-show-errors \
+        --exclude "*" --include "*.vtt" --content-type text/vtt --cache-control "$REVALIDATE"
 else
-    echo "-> skipping movie/: $MEDIA_DIR not found (run make-media.sh first, or set MEDIA_DIR)"
+    echo "-> skipping movie/: $MEDIA_DIR not found (run ../media/make-media.sh first, or set MEDIA_DIR)"
 fi
 
 echo "-> invalidating CloudFront cache"

@@ -48,6 +48,9 @@
             <div id="message" class="notice" role="status" aria-live="polite"></div>
             <div id="devices" class="device-list"></div>
             <video id="video" controls playsinline hidden></video>
+            <label class="quality" hidden>Calidad
+                <select id="quality"></select>
+            </label>
             <details class="app-details">
                 <summary>Detalles técnicos</summary>
                 <div id="status" class="app-status"></div>
@@ -86,6 +89,7 @@
   const devicesEl = document.getElementById('devices');
   const video = document.getElementById('video');
   const playBtn = document.getElementById('play');
+  const qualityEl = document.getElementById('quality');
   let hls = null;
   let playerReady = false;
   let loadingStopped = false;
@@ -348,6 +352,27 @@
     }
   }
 
+  function buildQualityMenu() {
+    if (hls.levels.length < 2) return;
+    const options = [new Option('Auto', '-1')];
+    hls.levels
+      .map((level, index) => ({ height: level.height, index }))
+      .sort((a, b) => b.height - a.height)
+      .forEach(({ height, index }) => options.push(new Option(`${height}p`, String(index))));
+    qualityEl.replaceChildren(...options);
+    qualityEl.parentElement.hidden = false;
+  }
+
+  function updateAutoLabel() {
+    const level = hls.levels[hls.currentLevel];
+    qualityEl.options[0].text = hls.autoLevelEnabled && level ? `Auto (${level.height}p)` : 'Auto';
+  }
+
+  qualityEl.addEventListener('change', () => {
+    hls.currentLevel = Number(qualityEl.value);
+    log(`quality: ${qualityEl.selectedOptions[0].text}`);
+  });
+
   function setUpPlayer() {
     if (Hls.isSupported()) {
       log('using hls.js');
@@ -365,6 +390,8 @@
           stopPlayback();
         }
       });
+      hls.on(Hls.Events.MANIFEST_PARSED, buildQualityMenu);
+      hls.on(Hls.Events.LEVEL_SWITCHED, updateAutoLabel);
       hls.loadSource(SRC);
       hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {

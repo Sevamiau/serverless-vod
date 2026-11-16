@@ -8,3 +8,5 @@ index.zip
 cookies.txt 
 plan.txt
 aws/site-drafts/
+aws/media/*
+!aws/media/make-media.sh
