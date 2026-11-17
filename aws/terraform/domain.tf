@@ -21,13 +21,13 @@ resource "aws_acm_certificate" "site" {
 }
 
 resource "aws_route53_record" "cert_validation" {
-  for_each = {
+  for_each = local.has_domain ? {
     for dvo in flatten(aws_acm_certificate.site[*].domain_validation_options) : dvo.domain_name => {
       name   = dvo.resource_record_name
       type   = dvo.resource_record_type
       record = dvo.resource_record_value
     }
-  }
+  } : {}
 
   zone_id         = aws_route53_zone.site[0].zone_id
   name            = each.value.name
