@@ -106,6 +106,8 @@ resource "aws_lambda_function" "playback_token" {
   runtime       = "nodejs24.x"
   timeout       = 10
 
+  reserved_concurrent_executions = try(local.settings.lambda_caps.playback_token, -1)
+
   logging_config {
     log_format = "Text"
     log_group  = aws_cloudwatch_log_group.lambda["playback_token"].name

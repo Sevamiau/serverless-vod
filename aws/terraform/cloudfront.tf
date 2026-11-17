@@ -129,6 +129,14 @@ resource "aws_cloudfront_distribution" "distribution" {
 
     viewer_protocol_policy     = "redirect-to-https"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.redirect_to_domain
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -158,6 +166,14 @@ resource "aws_cloudfront_distribution" "distribution" {
 
     viewer_protocol_policy     = "redirect-to-https"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.redirect_to_domain
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -170,6 +186,14 @@ resource "aws_cloudfront_distribution" "distribution" {
 
     viewer_protocol_policy     = "redirect-to-https"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+
+    dynamic "function_association" {
+      for_each = aws_cloudfront_function.redirect_to_domain
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value.arn
+      }
+    }
   }
 
   price_class = "PriceClass_100"

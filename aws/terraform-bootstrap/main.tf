@@ -11,7 +11,7 @@ terraform {
 
 provider "aws" {
   region  = "sa-east-1"
-  profile = "default"
+  profile = terraform.workspace == "cliente" ? "cliente" : "default"
 }
 
 data "aws_caller_identity" "current" {}

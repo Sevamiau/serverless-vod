@@ -25,6 +25,7 @@ LADDER=(
 if [ -f source.mp4 ]; then
   IN=(-i source.mp4)
   AUDIO=0:a:0
+  PRESET=slow
   DUR=$($FP -v error -show_entries format=duration -of csv=p=0 source.mp4 | cut -d. -f1)
   SRC_H=$($FP -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 source.mp4)
   echo "-> encoding source.mp4 (${DUR}s, ${SRC_H}p)"
@@ -33,6 +34,7 @@ else
   IN=(-f lavfi -i "testsrc2=size=1920x1080:rate=30:duration=$DUR"
       -f lavfi -i "sine=frequency=330:sample_rate=48000:duration=$DUR")
   AUDIO=1:a
+  PRESET=veryfast
   SRC_H=1080
   echo "-> no source.mp4: generating color bars (${DUR}s)"
 fi
@@ -61,7 +63,7 @@ done
 
 $FF -y -loglevel error "${IN[@]}" \
   -filter_complex "$FILTER" "${MAPS[@]}" \
-  -c:v libx264 -preset veryfast -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p \
+  -c:v libx264 -preset "$PRESET" -force_key_frames "expr:gte(t,n_forced*2)" -sc_threshold 0 -pix_fmt yuv420p \
   -c:a aac -b:a 128k -ac 2 "${RATES[@]}" \
   -f hls -hls_time 4 -hls_playlist_type vod -hls_list_size 0 \
   -hls_segment_filename "$OUT/%v/seg%04d.ts" \

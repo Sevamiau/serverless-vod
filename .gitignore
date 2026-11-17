@@ -1,4 +1,5 @@
 .terraform/
+.terraform-*/
 *.tfstate
 *.tfstate.*
 crash.log
@@ -10,3 +11,4 @@ plan.txt
 aws/site-drafts/
 aws/media/*
 !aws/media/make-media.sh
+mov/

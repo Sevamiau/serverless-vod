@@ -7,12 +7,18 @@ locals {
       serve_on_domain = false
       protect_data    = false
       alert_email     = "sevakunjadas.bms@gmail.com"
+      monthly_budget  = 20
+      lambda_caps     = null
     }
     cliente = {
       domain          = ""
       serve_on_domain = false
       protect_data    = true
       alert_email     = "sevakunjadas.bms@gmail.com"
+      monthly_budget  = 30
+      # needs the account's Lambda concurrency raised above 10 first,
+      # then e.g. { api = 50, playback_token = 50, webhook = 10 }
+      lambda_caps = null
     }
   }
 

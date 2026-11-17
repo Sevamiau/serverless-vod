@@ -101,6 +101,8 @@ resource "aws_lambda_function" "api" {
   runtime       = "nodejs24.x"
   timeout       = 10
 
+  reserved_concurrent_executions = try(local.settings.lambda_caps.api, -1)
+
   logging_config {
     log_format = "Text"
     log_group  = aws_cloudwatch_log_group.lambda["api"].name
