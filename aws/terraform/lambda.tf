@@ -27,7 +27,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "ssm:GetParameter",
         ]
         Effect   = "Allow"
-        Resource = aws_ssm_parameter.movie_signing_key_private.arn
+        Resource = "${local.ssm_arn}/movie-signing-key"
       },
       {
         Action = [
@@ -118,7 +118,7 @@ resource "aws_lambda_function" "playback_token" {
 
   environment {
     variables = {
-      PUBLIC_KEY_ID = aws_cloudfront_public_key.movie_key.id
+      PUBLIC_KEY_ID = one(values(aws_cloudfront_public_key.movie_key)).id
     }
   }
   lifecycle {
@@ -136,10 +136,10 @@ resource "aws_cloudfront_origin_access_control" "lambda_oac" {
 resource "null_resource" "set_lambda_distribution_domian" {
   triggers = {
     site_domain   = local.site_domain
-    public_key_id = aws_cloudfront_public_key.movie_key.id
+    public_key_id = one(values(aws_cloudfront_public_key.movie_key)).id
   }
   provisioner "local-exec" {
-    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={SITE_DOMAIN=${local.site_domain},PUBLIC_KEY_ID=${aws_cloudfront_public_key.movie_key.id}}'"
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.playback_token.function_name} --environment 'Variables={SITE_DOMAIN=${local.site_domain},PUBLIC_KEY_ID=${one(values(aws_cloudfront_public_key.movie_key)).id}}'"
     environment = {
       AWS_PROFILE = local.aws_profile
       AWS_REGION  = local.aws_region

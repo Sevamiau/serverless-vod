@@ -173,6 +173,16 @@ export const handler = async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000);
+  try {
+    await ddb.send(new PutCommand({
+      TableName: 'svod-users',
+      Item: { email: order.userEmail, createdAt: now },
+      ConditionExpression: 'attribute_not_exists(email)',
+    }));
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
+  }
+
   await ddb.send(new UpdateCommand({
     TableName: 'svod-entitlements',
     Key: { userEmail: order.userEmail, productId: order.productId },
@@ -200,7 +210,7 @@ export const handler = async (event) => {
     Item: { tokenHash, userEmail: order.userEmail, expiresAt: now + 72 * 3600, usedAt: null },
   }));
 
-  const link = `https://${process.env.SITE_DOMAIN}/api/auth/callback?token=${token}`;
+  const link = `https://${process.env.SITE_DOMAIN}/entrar.html#token=${token}`;
   await ses.send(new SendEmailCommand({
     Source: process.env.SENDER_EMAIL,
     Destination: { ToAddresses: [order.userEmail] },

@@ -25,6 +25,7 @@ const CFG = {
   productId: 'film01',
   deviceCap: 3,
   concurrencyWindowSec: 300, // > ver.html's 4 min refresh
+  ipChangeIntervalSec: 900,
 };
 
 function getSessionToken(event) {
@@ -80,21 +81,37 @@ async function hasOtherActiveDevice(userEmail, deviceHash) {
   return (result.Items || []).length > 0;
 }
 
-async function registerDevice(userEmail, deviceHash, label, existing) {
+// moving networks is fine, taking turns between IPs is a shared account
+async function registerDevice(userEmail, deviceHash, label, existing, ip) {
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 90 * 24 * 3600;
-  if (existing) {
+  if (!existing) {
+    await ddb.send(new PutCommand({
+      TableName: 'svod-devices',
+      Item: { userEmail, deviceHash, label: (label || 'dispositivo').slice(0, 40), firstSeen: now, lastSeen: now, expiresAt, ip },
+    }));
+    return true;
+  }
+
+  const sameIp = !existing.ip || existing.ip === ip;
+  try {
     await ddb.send(new UpdateCommand({
       TableName: 'svod-devices',
       Key: { userEmail, deviceHash },
-      UpdateExpression: 'SET lastSeen = :now, expiresAt = :exp',
-      ExpressionAttributeValues: { ':now': now, ':exp': expiresAt },
+      UpdateExpression: sameIp
+        ? 'SET lastSeen = :now, expiresAt = :exp, ip = :ip'
+        : 'SET lastSeen = :now, expiresAt = :exp, ip = :ip, ipChangedAt = :now',
+      ConditionExpression: sameIp
+        ? 'attribute_not_exists(ip) OR ip = :ip'
+        : 'ip = :old AND (attribute_not_exists(ipChangedAt) OR ipChangedAt < :cutoff)',
+      ExpressionAttributeValues: sameIp
+        ? { ':now': now, ':exp': expiresAt, ':ip': ip }
+        : { ':now': now, ':exp': expiresAt, ':ip': ip, ':old': existing.ip, ':cutoff': now - CFG.ipChangeIntervalSec },
     }));
-  } else {
-    await ddb.send(new PutCommand({
-      TableName: 'svod-devices',
-      Item: { userEmail, deviceHash, label: (label || 'dispositivo').slice(0, 40), firstSeen: now, lastSeen: now, expiresAt },
-    }));
+    return true;
+  } catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') return false;
+    throw err;
   }
 }
 
@@ -142,12 +159,15 @@ function signPolicy(policyJson, privateKeyPem) {
   return sign.sign(privateKeyPem);
 }
 
+let cachedPrivateKey;
 async function getPrivateKey() {
+  if (cachedPrivateKey) return cachedPrivateKey;
   const result = await ssm.send(new GetParameterCommand({
     Name: '/serverless-vod/movie-signing-key',
     WithDecryption: true,
   }));
-  return result.Parameter.Value;
+  cachedPrivateKey = result.Parameter.Value;
+  return cachedPrivateKey;
 }
 
 export const handler = async (event) => {
@@ -173,10 +193,11 @@ export const handler = async (event) => {
   const blocked = await hasOtherActiveDevice(userEmail, deviceHash);
   if (blocked) return { statusCode: 403, body: JSON.stringify({ error: 'concurrency' }) };
 
-  await registerDevice(userEmail, deviceHash, body.label, existingDevice);
+  const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
+  const registered = await registerDevice(userEmail, deviceHash, body.label, existingDevice, sourceIp);
+  if (!registered) return { statusCode: 403, body: JSON.stringify({ error: 'ip-change' }) };
 
   const host = process.env.SITE_DOMAIN;
-  const sourceIp = parseViewerIp(event.headers['cloudfront-viewer-address']) || event.requestContext.http.sourceIp;
   await logPlayEvent(userEmail, deviceHash, sourceIp);
 
   const policy = buildPolicy(host, CFG.productId, 300, sourceIp);

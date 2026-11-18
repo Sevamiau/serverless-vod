@@ -35,9 +35,9 @@ async function checkRateLimit(key, limit, windowSeconds) {
 
 const CFG = {
   productId: 'film01',
-  productTitle: 'La película',
-  price: { currency: 'ARS', amount: 1 },
-}
+  productTitle: process.env.FILM_TITLE,
+  price: { currency: 'ARS', amount: Number(process.env.PRICE_ARS) },
+};
 
 let cachedMpAccessToken;
 async function getMpAccessToken() {
@@ -121,25 +121,6 @@ async function getSessionEmail(event) {
   return session.userEmail;
 }
 
-async function upsertUser(email) {
-  const normalized = email.trim().toLowerCase();
-
-  const existing = await ddb.send(new GetCommand({
-    TableName: 'svod-users',
-    Key: { email: normalized },
-  }));
-
-  if (existing.Item) return existing.Item;
-
-  const newUser = { email: normalized, createdAt: Math.floor(Date.now() / 1000) };
-  await ddb.send(new PutCommand({
-    TableName: 'svod-users',
-    Item: newUser,
-  }));
-
-  return newUser;
-}
-
 async function handleCheckout(event) {
   const body = parseJsonBody(event);
   if (!body) return BAD_BODY;
@@ -155,7 +136,9 @@ async function handleCheckout(event) {
     return { statusCode: 429, body: JSON.stringify({ error: 'too-many-requests' }) };
   }
 
-  const user = await upsertUser(email);
+  if (!(CFG.price.amount > 0) || !CFG.productTitle) throw new Error('PRICE_ARS / FILM_TITLE not set');
+
+  const userEmail = email.toLowerCase();
   const orderId = randomUUID();
   const claim = randomBytes(24).toString('base64url');
   const trace = traceCode();
@@ -165,7 +148,7 @@ async function handleCheckout(event) {
     Item: {
       orderId,
       claim,
-      userEmail: user.email,
+      userEmail,
       productId: CFG.productId,
       currency: CFG.price.currency,
       amount: CFG.price.amount,
@@ -175,7 +158,7 @@ async function handleCheckout(event) {
     },
   }));
 
-  const preference = await createMpPreference({ orderId, email: user.email });
+  const preference = await createMpPreference({ orderId, email: userEmail });
 
   return {
     statusCode: 200,
@@ -258,7 +241,7 @@ async function handleAuthRequest(event) {
       Item: { tokenHash, userEmail: email, expiresAt, usedAt: null },
     }));
 
-    const link = `https://${process.env.SITE_DOMAIN}/api/auth/callback?token=${token}`;
+    const link = `https://${process.env.SITE_DOMAIN}/entrar.html#token=${token}`;
     await ses.send(new SendEmailCommand({
       Source: process.env.SENDER_EMAIL,
       Destination: { ToAddresses: [email] },
@@ -277,7 +260,10 @@ export const handler = async (event) => {
   const path = event.rawPath;
   const routes = {
     'POST /api/auth/request': handleAuthRequest,
-    'GET /api/auth/callback': handleAuthCallback,
+    'GET /api/auth/callback': handleLegacyCallback,
+    'POST /api/auth/callback': handleAuthCallback,
+    'POST /api/auth/link-info': handleLinkInfo,
+    'GET /api/product': handleProduct,
     'POST /api/checkout': handleCheckout,
     'GET /api/order-status': handleOrderStatus,
     'POST /api/auth/logout': handleLogout,
@@ -290,50 +276,71 @@ export const handler = async (event) => {
   return fn(event);
 };
 
-async function handleAuthCallback(event) {
-  const token = event.queryStringParameters?.token ?? '';
+const BAD_LINK = { statusCode: 400, body: JSON.stringify({ error: 'link' }) };
+
+async function getLiveLink(token) {
+  if (typeof token !== 'string' || !token) return null;
   const tokenHash = sha256(token);
+  const result = await ddb.send(new GetCommand({ TableName: 'svod-magic-links', Key: { tokenHash } }));
+  const link = result.Item;
+  if (!link || link.usedAt || link.expiresAt < Math.floor(Date.now() / 1000)) return null;
+  return { ...link, tokenHash };
+}
+
+// links in emails sent before the confirmation page existed
+async function handleLegacyCallback(event) {
+  const token = event.queryStringParameters?.token ?? '';
+  return { statusCode: 302, headers: { location: `/entrar.html#token=${encodeURIComponent(token)}` } };
+}
+
+// read-only, so mail scanners that open the page don't use up the link
+async function handleLinkInfo(event) {
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
+  const link = await getLiveLink(body.token);
+  if (!link) return BAD_LINK;
+  return { statusCode: 200, body: JSON.stringify({ email: link.userEmail }) };
+}
+
+async function handleAuthCallback(event) {
+  const body = parseJsonBody(event);
+  if (!body) return BAD_BODY;
+  const link = await getLiveLink(body.token);
+  if (!link) return BAD_LINK;
+
   const now = Math.floor(Date.now() / 1000);
-
-  const linkResult = await ddb.send(new GetCommand({
-    TableName: 'svod-magic-links',
-    Key: { tokenHash },
-  }));
-  const link = linkResult.Item;
-
-  if (!link || link.usedAt || link.expiresAt < now) {
-    return { statusCode: 302, headers: { location: '/entrar.html?error=link' } };
-  }
-
   try {
     await ddb.send(new UpdateCommand({
       TableName: 'svod-magic-links',
-      Key: { tokenHash },
+      Key: { tokenHash: link.tokenHash },
       UpdateExpression: 'SET usedAt = :now',
       ConditionExpression: 'usedAt = :null',
       ExpressionAttributeValues: { ':now': now, ':null': null },
     }));
   } catch (err) {
-    if (err.name === 'ConditionalCheckFailedException') {
-      return { statusCode: 302, headers: { location: '/entrar.html?error=link' } };
-    }
+    if (err.name === 'ConditionalCheckFailedException') return BAD_LINK;
     throw err;
   }
 
   const sessionToken = randomBytes(32).toString('base64url');
-  const sessionHash = sha256(sessionToken);
   await ddb.send(new PutCommand({
     TableName: 'svod-sessions',
-    Item: { tokenHash: sessionHash, userEmail: link.userEmail, expiresAt: now + SESSION_MAX_AGE },
+    Item: { tokenHash: sha256(sessionToken), userEmail: link.userEmail, expiresAt: now + SESSION_MAX_AGE },
   }));
 
   return {
-    statusCode: 302,
-    headers: { location: '/ver.html' },
+    statusCode: 200,
+    body: JSON.stringify({ ok: true }),
     cookies: [`poc_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`],
   };
 }
 
+async function handleProduct() {
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ title: CFG.productTitle, amount: CFG.price.amount, currency: CFG.price.currency }),
+  };
+}
 async function handleLogout(event) {
   const sessionToken = getCookie(event, 'poc_session');
   if (sessionToken) {

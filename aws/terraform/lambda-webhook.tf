@@ -1,21 +1,15 @@
 
-resource "aws_ssm_parameter" "mp_webhook_secret" {
-  name  = "/serverless-vod/mp-webhook-secret"
-  type  = "SecureString"
-  value = "REPLACE_ME"
-
+removed {
+  from = aws_ssm_parameter.mp_webhook_secret
   lifecycle {
-    ignore_changes = [value]
+    destroy = false
   }
 }
 
-resource "aws_ssm_parameter" "mp_access_token" {
-  name  = "/serverless-vod/mp-access-token"
-  type  = "SecureString"
-  value = "REPLACE_ME"
-
+removed {
+  from = aws_ssm_parameter.mp_access_token
   lifecycle {
-    ignore_changes = [value]
+    destroy = false
   }
 }
 
@@ -47,8 +41,8 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
         Action = ["ssm:GetParameter"]
         Effect = "Allow"
         Resource = [
-          aws_ssm_parameter.mp_webhook_secret.arn,
-          aws_ssm_parameter.mp_access_token.arn,
+          "${local.ssm_arn}/mp-webhook-secret",
+          "${local.ssm_arn}/mp-access-token",
         ]
       },
       {
@@ -75,6 +69,11 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
         Action   = ["dynamodb:PutItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.magic_links.arn
+      },
+      {
+        Action   = ["dynamodb:PutItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.users.arn
       },
       {
         Action   = ["ses:SendEmail"]

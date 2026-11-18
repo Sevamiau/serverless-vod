@@ -39,8 +39,8 @@
 
     <main class="app-page">
         <div class="app-page__main">
-            <h1 class="app-page__title">Título de la película</h1>
-            <p class="app-page__price">$1 ARS</p>
+            <h1 id="title" class="app-page__title">Título de la película</h1>
+            <p id="price" class="app-page__price">&nbsp;</p>
             <p class="app-page__lead">Ingresá tu email y te llevamos a pagar con Mercado Pago. Cuando se confirma el pago, te llega a ese email el enlace para ver la película.</p>
             <div class="app-form">
                 <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
@@ -143,6 +143,15 @@
   }
 
   buyBtn.addEventListener('click', buy);
+
+  fetch('/api/product')
+    .then((res) => res.json())
+    .then(({ title, amount, currency }) => {
+      document.getElementById('title').textContent = title;
+      document.getElementById('price').textContent =
+        new Intl.NumberFormat('es-AR', { style: 'currency', currency }).format(amount);
+    })
+    .catch((err) => log(`product failed: ${err.message}`));
 </script>
 </body>
 </html>

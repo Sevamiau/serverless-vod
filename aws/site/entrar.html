@@ -42,6 +42,11 @@
             <h1 class="app-page__title">Entrar</h1>
             <p class="app-page__lead">Ingresá el email con el que compraste y te mandamos un enlace para entrar, sin contraseña.</p>
             <div id="linkError" class="notice error" hidden>El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
+            <div id="confirm" hidden>
+                <p class="app-page__lead">Vas a entrar como <strong id="confirmEmail"></strong>.</p>
+                <button id="enter" class="button button--white">Entrar</button>
+                <p class="app-page__small">¿No es tu email? No toques el botón y pedí tu propio enlace abajo.</p>
+            </div>
             <div class="app-form">
                 <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
                 <button id="send" class="button button--white">Enviar enlace</button>
@@ -75,6 +80,10 @@
   const sendBtn = document.getElementById('send');
   const emailInput = document.getElementById('email');
   const linkErrorEl = document.getElementById('linkError');
+
+  const confirmEl = document.getElementById('confirm');
+  const enterBtn = document.getElementById('enter');
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
 
   if (new URLSearchParams(window.location.search).get('error') === 'link') {
     linkErrorEl.hidden = false;
@@ -118,7 +127,52 @@
     sendBtn.disabled = false;
   }
 
+  async function postJson(path, payload) {
+    const body = JSON.stringify(payload);
+    return fetch(path, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': await sha256Hex(body) },
+      body,
+    });
+  }
+
+  function linkFailed() {
+    confirmEl.hidden = true;
+    linkErrorEl.hidden = false;
+  }
+
+  async function showConfirm() {
+    history.replaceState(null, '', window.location.pathname);
+    try {
+      const res = await postJson('/api/auth/link-info', { token });
+      if (!res.ok) return linkFailed();
+      document.getElementById('confirmEmail').textContent = (await res.json()).email;
+      confirmEl.hidden = false;
+    } catch (err) {
+      log(`link-info failed: ${err.message}`);
+      linkFailed();
+    }
+  }
+
+  async function enter() {
+    enterBtn.disabled = true;
+    try {
+      const res = await postJson('/api/auth/callback', { token });
+      if (res.ok) {
+        window.location.replace('/ver.html');
+        return;
+      }
+      linkFailed();
+    } catch (err) {
+      log(`callback failed: ${err.message}`);
+      enterBtn.disabled = false;
+    }
+  }
+
   sendBtn.addEventListener('click', sendLink);
+  enterBtn.addEventListener('click', enter);
+  if (token) showConfirm();
 </script>
 </body>
 </html>

@@ -30,7 +30,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
         Resource = aws_dynamodb_table.users.arn
       },
       {
-        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
+        Action   = ["dynamodb:UpdateItem"]
         Effect   = "Allow"
         Resource = aws_dynamodb_table.users.arn
       },
@@ -72,7 +72,7 @@ resource "aws_iam_role_policy" "api_lambda_policy" {
       {
         Action   = ["ssm:GetParameter"]
         Effect   = "Allow"
-        Resource = aws_ssm_parameter.mp_access_token.arn
+        Resource = "${local.ssm_arn}/mp-access-token"
       },
       {
         Action   = ["kms:Decrypt"]
@@ -136,17 +136,26 @@ resource "aws_lambda_permission" "allon_api" {
   source_arn    = aws_cloudfront_distribution.distribution.arn
 }
 
+locals {
+  api_env = jsonencode({ Variables = {
+    SITE_DOMAIN    = local.site_domain
+    SENDER_EMAIL   = local.sender_email
+    MP_WEBHOOK_URL = aws_lambda_function_url.webhook_url.function_url
+    PRICE_ARS      = tostring(local.settings.price_ars)
+    FILM_TITLE     = local.settings.film_title
+  } })
+}
+
 resource "null_resource" "set_api_lambda_distribution_domain" {
   triggers = {
-    site_domain    = local.site_domain
-    sender_email   = local.sender_email
-    mp_webhook_url = aws_lambda_function_url.webhook_url.function_url
+    env = local.api_env
   }
   provisioner "local-exec" {
-    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment 'Variables={SITE_DOMAIN=${local.site_domain},SENDER_EMAIL=${local.sender_email},MP_WEBHOOK_URL=${aws_lambda_function_url.webhook_url.function_url}}'"
+    command = "aws lambda update-function-configuration --function-name ${aws_lambda_function.api.function_name} --environment \"$LAMBDA_ENV\""
     environment = {
       AWS_PROFILE = local.aws_profile
       AWS_REGION  = local.aws_region
+      LAMBDA_ENV  = local.api_env
     }
   }
 }

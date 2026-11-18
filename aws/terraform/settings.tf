@@ -9,6 +9,8 @@ locals {
       alert_email     = "sevakunjadas.bms@gmail.com"
       monthly_budget  = 20
       lambda_caps     = null
+      price_ars       = 1
+      film_title      = "La película"
     }
     cliente = {
       domain          = ""
@@ -19,6 +21,9 @@ locals {
       # needs the account's Lambda concurrency raised above 10 first,
       # then e.g. { api = 50, playback_token = 50, webhook = 10 }
       lambda_caps = null
+      # set before launch
+      price_ars  = 1
+      film_title = "La película"
     }
   }
 
@@ -28,6 +33,8 @@ locals {
   serve_on_domain = local.has_domain && local.settings.serve_on_domain
 
   # validation needs a non-empty name even with count = 0
+  ssm_arn = "arn:aws:ssm:${local.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/serverless-vod"
+
   zone_name = local.has_domain ? local.domain : "unset.invalid"
 
   site_domain = local.serve_on_domain ? local.domain : aws_cloudfront_distribution.distribution.domain_name

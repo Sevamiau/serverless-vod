@@ -162,6 +162,9 @@
           'y este no es uno de ellos. Los dispositivos que no usás durante 90 días se liberan solos.');
         showDevices();
         break;
+      case 'ip-change':
+        showMessage('Cambiaste de red hace poco, o tu cuenta se está usando desde otro lugar. Volvé a darle play en unos minutos.');
+        break;
       case 'concurrency':
         showMessage('La película se está viendo en otro dispositivo. Cerrala ahí y volvé a darle play en unos minutos.');
         break;
