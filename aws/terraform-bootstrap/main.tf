@@ -31,6 +31,26 @@ resource "aws_s3_bucket_versioning" "tfstate" {
   }
 }
 
+# old state versions can hold secrets from before they left Terraform
+resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
+  bucket     = aws_s3_bucket.tfstate.id
+  depends_on = [aws_s3_bucket_versioning.tfstate]
+
+  rule {
+    id     = "expire-old-state-versions"
+    status = "Enabled"
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate" {
   bucket = aws_s3_bucket.tfstate.id
   rule {
