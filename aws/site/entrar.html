@@ -40,19 +40,21 @@
     <main class="app-page">
         <div class="app-page__main">
             <h1 class="app-page__title">Entrar</h1>
-            <p class="app-page__lead">Ingresá el email con el que compraste y te mandamos un enlace para entrar, sin contraseña.</p>
-            <div id="linkError" class="notice error" hidden>El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
             <div id="confirm" hidden>
                 <p class="app-page__lead">Vas a entrar como <strong id="confirmEmail"></strong>.</p>
                 <button id="enter" class="button button--white">Entrar</button>
-                <p class="app-page__small">¿No es tu email? No toques el botón y pedí tu propio enlace abajo.</p>
+                <p class="app-page__small">¿No es tu email? <a href="#" id="notMe">Pedí tu propio enlace</a>.</p>
             </div>
-            <div class="app-form">
-                <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
-                <button id="send" class="button button--white">Enviar enlace</button>
+            <div id="request">
+                <p class="app-page__lead">Ingresá el email con el que compraste y te mandamos un enlace para entrar, sin contraseña.</p>
+                <div id="linkError" class="notice error" hidden>El enlace expiró o ya fue usado. Pedí uno nuevo abajo.</div>
+                <div class="app-form">
+                    <input id="email" type="email" placeholder="tu@email.com" autocomplete="email">
+                    <button id="send" class="button button--white">Enviar enlace</button>
+                </div>
+                <p class="app-page__small">¿Todavía no la tenés? <a href="comprar.html">Comprala acá</a>.</p>
             </div>
             <div id="status" class="app-status"></div>
-            <p class="app-page__small">¿Todavía no la tenés? <a href="comprar.html">Comprala acá</a>.</p>
         </div>
     </main>
 
@@ -82,6 +84,7 @@
   const linkErrorEl = document.getElementById('linkError');
 
   const confirmEl = document.getElementById('confirm');
+  const requestEl = document.getElementById('request');
   const enterBtn = document.getElementById('enter');
   const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
 
@@ -137,8 +140,13 @@
     });
   }
 
-  function linkFailed() {
+  function showRequest() {
     confirmEl.hidden = true;
+    requestEl.hidden = false;
+  }
+
+  function linkFailed() {
+    showRequest();
     linkErrorEl.hidden = false;
   }
 
@@ -148,6 +156,7 @@
       const res = await postJson('/api/auth/link-info', { token });
       if (!res.ok) return linkFailed();
       document.getElementById('confirmEmail').textContent = (await res.json()).email;
+      requestEl.hidden = true;
       confirmEl.hidden = false;
     } catch (err) {
       log(`link-info failed: ${err.message}`);
@@ -172,7 +181,14 @@
 
   sendBtn.addEventListener('click', sendLink);
   enterBtn.addEventListener('click', enter);
-  if (token) showConfirm();
+  document.getElementById('notMe').addEventListener('click', (e) => {
+    e.preventDefault();
+    showRequest();
+  });
+  if (token) {
+    requestEl.hidden = true;
+    showConfirm();
+  }
 </script>
 </body>
 </html>
