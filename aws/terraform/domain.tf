@@ -120,7 +120,7 @@ resource "aws_route53_record" "dmarc" {
   records = ["v=DMARC1; p=none"]
 }
 
-# receiving: ImprovMX forwards contacto@ to a mailbox set in its dashboard
+# receiving: ImprovMX forwards hola@ to a mailbox set in its dashboard
 resource "aws_route53_record" "mx" {
   count   = local.has_domain ? 1 : 0
   zone_id = aws_route53_zone.site[0].zone_id
