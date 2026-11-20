@@ -183,12 +183,15 @@ export const handler = async (event) => {
     if (err.name !== 'ConditionalCheckFailedException') throw err;
   }
 
-  await ddb.send(new UpdateCommand({
+  // a repeat buyer keeps their first copy code
+  const granted = await ddb.send(new UpdateCommand({
     TableName: 'svod-entitlements',
     Key: { userEmail: order.userEmail, productId: order.productId },
     UpdateExpression: 'SET grantedAt = :now, traceCode = if_not_exists(traceCode, :tc) REMOVE revokedAt',
     ExpressionAttributeValues: { ':now': now, ':tc': order.traceCode },
+    ReturnValues: 'ALL_NEW',
   }));
+  const copyCode = granted.Attributes.traceCode;
 
   try {
     await ddb.send(new UpdateCommand({
@@ -218,7 +221,7 @@ export const handler = async (event) => {
       Subject: { Data: 'Tu acceso a la película' },
       Body: {
         Text: {
-          Data: `Gracias por tu compra.\nVer la película: ${link}\nCódigo de tu copia: ${order.traceCode}`,
+          Data: `Gracias por tu compra.\nVer la película: ${link}\nCódigo de tu copia: ${copyCode}`,
         },
       },
     },

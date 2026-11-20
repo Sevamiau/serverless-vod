@@ -138,7 +138,18 @@
       return;
     }
 
-    const { redirect } = await res.json();
+    const { redirect, owned } = await res.json();
+    if (owned) {
+      log('checkout: already owned, sign-in link sent');
+      messageEl.className = 'notice info';
+      messageEl.replaceChildren(
+        'Ya compraste la película con este email. Te mandamos un enlace para entrar: revisá tu correo. También podés pedirlo desde ',
+        Object.assign(document.createElement('a'), { href: 'entrar.html', textContent: 'Entrar' }),
+        '.',
+      );
+      buyBtn.disabled = false;
+      return;
+    }
     log(`checkout OK, redirecting to Mercado Pago...`);
     buyBtn.textContent = 'Te llevamos a Mercado Pago…';
     window.location.href = redirect;

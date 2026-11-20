@@ -14,3 +14,4 @@ aws/media/*
 !aws/media/make-hero.sh
 aws/site/media/
 mov/
+README2.md

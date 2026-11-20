@@ -186,6 +186,9 @@ a.contact__value:hover { text-decoration: underline; }
 .trace-code:empty { display: none; }
 .notice { margin-bottom: 18px; padding: 12px 16px; border-radius: 8px; font: 400 15px/1.5 var(--font-dmsans); }
 .notice:empty { display: none; }
+.notice.info { background: #ffffff14; color: #e6e6e6; }
+.pay-with + .notice { margin-top: 20px; }
+.notice.info a { color: #fff; }
 .notice.warn { background: #3a3320; color: #eecc99; }
 .notice.error { background: #3a2020; color: #ee99aa; }
 .device-list { font: 400 15px/1.5 var(--font-dmsans); }

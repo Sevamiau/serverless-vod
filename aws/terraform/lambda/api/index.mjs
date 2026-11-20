@@ -139,6 +139,11 @@ async function handleCheckout(event) {
   if (!(CFG.price.amount > 0) || !CFG.productTitle) throw new Error('PRICE_ARS / FILM_TITLE not set');
 
   const userEmail = email.toLowerCase();
+  if (await ownsFilm(userEmail)) {
+    if (await checkRateLimit(`authreq:${userEmail}`, 1, 60)) await sendSignInLink(userEmail);
+    return { statusCode: 200, body: JSON.stringify({ owned: true }) };
+  }
+
   const orderId = randomUUID();
   const claim = randomBytes(24).toString('base64url');
   const trace = traceCode();
@@ -231,28 +236,38 @@ async function handleAuthRequest(event) {
     Key: { email },
   }));
 
-  if (userResult.Item) {
-    const token = randomBytes(24).toString('base64url');
-    const tokenHash = sha256(token);
-    const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
-
-    await ddb.send(new PutCommand({
-      TableName: 'svod-magic-links',
-      Item: { tokenHash, userEmail: email, expiresAt, usedAt: null },
-    }));
-
-    const link = `https://${process.env.SITE_DOMAIN}/entrar.html#token=${token}`;
-    await ses.send(new SendEmailCommand({
-      Source: process.env.SENDER_EMAIL,
-      Destination: { ToAddresses: [email] },
-      Message: {
-        Subject: { Data: 'Tu enlace de acceso' },
-        Body: { Text: { Data: link } },
-      },
-    }));
-  }
+  if (userResult.Item) await sendSignInLink(email);
 
   return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+}
+
+async function sendSignInLink(email) {
+  const token = randomBytes(24).toString('base64url');
+  const tokenHash = sha256(token);
+  const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
+
+  await ddb.send(new PutCommand({
+    TableName: 'svod-magic-links',
+    Item: { tokenHash, userEmail: email, expiresAt, usedAt: null },
+  }));
+
+  const link = `https://${process.env.SITE_DOMAIN}/entrar.html#token=${token}`;
+  await ses.send(new SendEmailCommand({
+    Source: process.env.SENDER_EMAIL,
+    Destination: { ToAddresses: [email] },
+    Message: {
+      Subject: { Data: 'Tu enlace de acceso' },
+      Body: { Text: { Data: link } },
+    },
+  }));
+}
+
+async function ownsFilm(email) {
+  const r = await ddb.send(new GetCommand({
+    TableName: 'svod-entitlements',
+    Key: { userEmail: email, productId: CFG.productId },
+  }));
+  return Boolean(r.Item && !r.Item.revokedAt);
 }
 
 export const handler = async (event) => {
