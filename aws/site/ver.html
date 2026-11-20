@@ -50,10 +50,6 @@
             <label class="quality" hidden>Calidad
                 <select id="quality"></select>
             </label>
-            <details class="app-details">
-                <summary>Detalles técnicos</summary>
-                <div id="status" class="app-status"></div>
-            </details>
         </div>
     </main>
 
@@ -83,7 +79,6 @@
   const MAX_REFRESH_RETRIES = 3;
   const MAX_RECOVERY_ATTEMPTS = 4;
   const MAX_FATAL_STREAK = 3;
-  const statusEl = document.getElementById('status');
   const messageEl = document.getElementById('message');
   const devicesEl = document.getElementById('devices');
   const video = document.getElementById('video');
@@ -99,7 +94,7 @@
   let fatalStreak = 0;
 
   function log(line) {
-    statusEl.textContent += line + '\n';
+    console.debug(line);
   }
 
   function showMessage(text, kind = 'error', link) {

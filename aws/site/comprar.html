@@ -50,10 +50,6 @@
             </p>
             <div id="message" class="notice" role="status" aria-live="polite"></div>
             <p class="app-page__small">Al comprar aceptás los <a href="terminos.html">términos y condiciones</a>.</p>
-            <details class="app-details">
-                <summary>Detalles técnicos</summary>
-                <div id="status" class="app-status"></div>
-            </details>
         </div>
     </main>
 
@@ -77,7 +73,6 @@
 
     <script src="main.js"></script>
 <script>
-  const statusEl = document.getElementById('status');
   const buyBtn = document.getElementById('buy');
   const emailInput = document.getElementById('email');
   const messageEl = document.getElementById('message');
@@ -94,7 +89,7 @@
   }
 
   function log(line) {
-    statusEl.textContent += line + '\n';
+    console.debug(line);
   }
 
   async function sha256Hex(str) {
@@ -112,7 +107,6 @@
     buyBtn.disabled = true;
     messageEl.className = 'notice';
     messageEl.textContent = '';
-    statusEl.textContent = '';
     log('POST /api/checkout ...');
 
     const body = JSON.stringify({ email });

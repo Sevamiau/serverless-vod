@@ -42,7 +42,6 @@
             <p id="message" class="app-page__lead">Mercado Pago nos avisa en cuanto confirma el pago &mdash; esto puede tardar unos segundos.</p>
             <div id="trace" class="trace-code"></div>
             <p id="watch-link" class="app-page__lead" style="display:none">Te mandamos un email con un enlace para entrar y ver la película.</p>
-            <div id="status" class="app-status"></div>
         </div>
     </main>
 
@@ -66,14 +65,13 @@
 
     <script src="main.js"></script>
 <script>
-  const statusEl = document.getElementById('status');
   const titleEl = document.getElementById('title');
   const messageEl = document.getElementById('message');
   const traceEl = document.getElementById('trace');
   const watchLinkEl = document.getElementById('watch-link');
 
   function log(line) {
-    statusEl.textContent += line + '\n';
+    console.debug(line);
   }
 
   const params = new URLSearchParams(window.location.search);

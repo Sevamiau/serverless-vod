@@ -148,6 +148,7 @@ locals {
     MP_WEBHOOK_URL = aws_lambda_function_url.webhook_url.function_url
     PRICE_ARS      = tostring(local.settings.price_ars)
     FILM_TITLE     = local.settings.film_title
+    CONTACT_EMAIL  = local.settings.contact_email
   } })
 }
 

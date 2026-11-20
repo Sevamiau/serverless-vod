@@ -115,8 +115,10 @@ resource "aws_lambda_function" "webhook" {
 
   environment {
     variables = {
-      SITE_DOMAIN  = local.site_domain
-      SENDER_EMAIL = local.sender_email
+      SITE_DOMAIN   = local.site_domain
+      SENDER_EMAIL  = local.sender_email
+      FILM_TITLE    = local.settings.film_title
+      CONTACT_EMAIL = local.settings.contact_email
     }
   }
 }

@@ -53,7 +53,6 @@
                 </div>
                 <p class="app-page__small">¿Todavía no la tenés? <a href="comprar.html">Comprala acá</a>.</p>
             </div>
-            <div id="status" class="app-status"></div>
         </div>
     </main>
 
@@ -77,7 +76,6 @@
 
     <script src="main.js"></script>
 <script>
-  const statusEl = document.getElementById('status');
   const sendBtn = document.getElementById('send');
   const emailInput = document.getElementById('email');
   const linkErrorEl = document.getElementById('linkError');
@@ -92,7 +90,7 @@
   }
 
   function log(line) {
-    statusEl.textContent += line + '\n';
+    console.debug(line);
   }
 
   async function sha256Hex(str) {
@@ -108,7 +106,6 @@
     }
 
     sendBtn.disabled = true;
-    statusEl.textContent = '';
     log('POST /api/auth/request ...');
 
     const body = JSON.stringify({ email });

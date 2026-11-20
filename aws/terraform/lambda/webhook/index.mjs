@@ -10,6 +10,32 @@ const ses = new SESClient({});
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+// same template in api and webhook
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function mailBody({ intro, button, link, notes }) {
+  const title = process.env.FILM_TITLE || 'La película';
+  const contact = process.env.CONTACT_EMAIL;
+  const help = contact ? `¿Algún problema? Escribinos a ${contact}.` : '';
+  const p = (t, style = '') => `<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#333;${style}">${t}</p>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background:#f2f2f2"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f2f2;padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:12px;padding:36px 32px;font-family:Helvetica,Arial,sans-serif">
+<tr><td>
+<p style="margin:0 0 8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#888">film.ar</p>
+<h1 style="margin:0 0 24px;font-size:28px;line-height:32px;color:#111">${esc(title)}</h1>
+${intro.map((t) => p(t)).join('')}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="border-radius:100px;background:#111">
+<a href="${esc(link)}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:bold;color:#fff;text-decoration:none">${esc(button)}</a>
+</td></tr></table>
+${notes.map((t) => p(t, 'font-size:14px;line-height:21px;color:#666')).join('')}
+${help ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:13px;color:#888">${esc(help)}</p>` : ''}
+</td></tr></table></td></tr></table></body></html>`;
+  const strip = (t) => t.replace(/<[^>]+>/g, '');
+  const text = [title, '', ...intro.map(strip), '', `${button}: ${link}`, '', ...notes.map(strip), '', help].join('\n');
+  return { Html: { Data: html, Charset: 'UTF-8' }, Text: { Data: text, Charset: 'UTF-8' } };
+}
+
 function parseJsonBody(event) {
   if (!event.body) return {};
   try {
@@ -218,12 +244,16 @@ export const handler = async (event) => {
     Source: process.env.SENDER_EMAIL,
     Destination: { ToAddresses: [order.userEmail] },
     Message: {
-      Subject: { Data: 'Tu acceso a la película' },
-      Body: {
-        Text: {
-          Data: `Gracias por tu compra.\nVer la película: ${link}\nCódigo de tu copia: ${copyCode}`,
-        },
-      },
+      Subject: { Data: `Tu acceso a ${process.env.FILM_TITLE || 'la película'}`, Charset: 'UTF-8' },
+      Body: mailBody({
+        intro: ['¡Gracias por tu compra! Ya podés ver la película.'],
+        button: 'Ver la película',
+        link,
+        notes: [
+          `Tu código de copia es <b>${esc(copyCode)}</b>. Es personal e identifica tu compra.`,
+          'El botón te hace entrar sin contraseña y vale por 72 horas. Después podés pedir un enlace nuevo desde Entrar, en el sitio.',
+        ],
+      }),
     },
   }));
 

@@ -177,9 +177,6 @@ a.contact__value:hover { text-decoration: underline; }
 .pay-with__brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 15px; letter-spacing: 0; color: #fff; }
 .pay-with__brand svg { width: 26px; height: 26px; }
 .app-form input { width: 100%; padding: 12px 15px; margin-bottom: 18px; background: #1a1a1a; border-color: #333; color: #fff; }
-.app-status { margin-top: 18px; font: 13px/1.5 "SFMono-Regular", Consolas, monospace; color: #8a9a9a; white-space: pre-wrap; }
-.app-status:empty { display: none; }
-.app-details { margin-top: 18px; font-size: 13px; color: #8a9a9a; }
 .quality { display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; font: 400 14px var(--font-dmsans); color: #d0d0d0; }
 .quality select { font: inherit; color: #fff; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 6px 10px; }
 .trace-code { font: 400 44px/1 var(--font-league); letter-spacing: .08em; margin-bottom: 24px; }
