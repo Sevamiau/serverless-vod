@@ -15,7 +15,8 @@ function handler(event) {
   var request = event.request;
   var host = request.headers.host ? request.headers.host.value : "";
 
-  if (!host.endsWith(".cloudfront.net")) {
+  // *.cloudfront.net and www both go to the bare domain
+  if (host === DOMAIN) {
     return request;
   }
 
