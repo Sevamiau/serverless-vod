@@ -11,4 +11,6 @@ plan.txt
 aws/site-drafts/
 aws/media/*
 !aws/media/make-media.sh
+!aws/media/make-hero.sh
+aws/site/media/
 mov/

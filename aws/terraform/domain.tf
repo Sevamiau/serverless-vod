@@ -20,19 +20,18 @@ resource "aws_acm_certificate" "site" {
   }
 }
 
+locals {
+  cert_dvo = { for dvo in flatten(aws_acm_certificate.site[*].domain_validation_options) : dvo.domain_name => dvo }
+}
+
+# keys known at plan time; values come from the certificate
 resource "aws_route53_record" "cert_validation" {
-  for_each = local.has_domain ? {
-    for dvo in flatten(aws_acm_certificate.site[*].domain_validation_options) : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  } : {}
+  for_each = local.has_domain ? toset([local.zone_name, "www.${local.zone_name}"]) : toset([])
 
   zone_id         = aws_route53_zone.site[0].zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = [each.value.record]
+  name            = local.cert_dvo[each.key].resource_record_name
+  type            = local.cert_dvo[each.key].resource_record_type
+  records         = [local.cert_dvo[each.key].resource_record_value]
   ttl             = 300
   allow_overwrite = true
 }

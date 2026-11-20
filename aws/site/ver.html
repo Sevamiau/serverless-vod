@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ver — Mi Proyecto</title>
+    <title>Ver — film.ar</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js"></script>
 </head>
@@ -11,8 +11,7 @@
     <header class="header js-header">
         <div class="header__container container">
             <a href="index.html" class="header__logo js-header-logo" aria-label="Inicio">
-                <span class="header__logo-mark"></span>
-                <span class="header__logo-text">mi proyecto</span>
+                <span class="header__logo-text">film.ar</span>
             </a>
 
             <div class="header__right-container">
@@ -41,7 +40,7 @@
     <main class="app-page">
         <div class="app-page__main app-page__main--wide">
             <div class="app-page__toolbar">
-                <h1 class="app-page__title">Título de la película</h1>
+                <h1 class="app-page__title">El florecer de un bombisto</h1>
                 <button id="logout" class="button button--outline">Salir</button>
             </div>
             <button id="play" class="button button--white app-page__play">Ver</button>
@@ -265,6 +264,7 @@
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       lastMintAt = Date.now();
+      holdingSlot = true;
       log(`mint OK: HTTP ${res.status}`);
       return { ok: true };
     }
@@ -279,6 +279,29 @@
       return { ok: false, transient: false };
     }
     return { ok: false, transient: true };
+  }
+
+  // tells the server this device stopped, so another one can play right away
+  let holdingSlot = false;
+  let releaseReq = null;
+  async function prepareRelease() {
+    const body = JSON.stringify({ deviceId: getDeviceId(), release: true });
+    releaseReq = { body, hash: await sha256Hex(body) };
+  }
+  prepareRelease().catch(() => {});
+
+  function releaseSlot() {
+    clearTimeout(refreshTimer);
+    lastMintAt = 0;
+    if (!holdingSlot || !releaseReq) return;
+    holdingSlot = false;
+    fetch('/api/playback-token', {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+      headers: { 'content-type': 'application/json', 'x-amz-content-sha256': releaseReq.hash },
+      body: releaseReq.body,
+    }).catch(() => {});
   }
 
   function stopPlayback() {
@@ -463,8 +486,9 @@
   }
 
   video.addEventListener('play', onResume);
-  video.addEventListener('pause', () => clearTimeout(refreshTimer));
-  video.addEventListener('ended', () => clearTimeout(refreshTimer));
+  video.addEventListener('pause', releaseSlot);
+  video.addEventListener('ended', releaseSlot);
+  window.addEventListener('pagehide', releaseSlot);
   playBtn.addEventListener('click', start);
 
   document.getElementById('logout').addEventListener('click', async () => {

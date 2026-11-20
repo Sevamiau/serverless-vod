@@ -29,9 +29,11 @@ DAY="public, max-age=86400"
 # cp, not sync: sync skips unchanged files, which would keep their old headers
 echo "-> site (../site/)"
 aws s3 cp ../site/ "s3://$SITE_BUCKET/" --recursive --only-show-errors \
-    --exclude "*.woff2" --cache-control "$REVALIDATE"
+    --exclude "*.woff2" --exclude "media/*" --cache-control "$REVALIDATE"
 aws s3 cp ../site/ "s3://$SITE_BUCKET/" --recursive --only-show-errors \
     --exclude "*" --include "*.woff2" --content-type font/woff2 --cache-control "$YEAR"
+aws s3 cp ../site/ "s3://$SITE_BUCKET/" --recursive --only-show-errors \
+    --exclude "*" --include "media/*" --cache-control "$DAY"
 aws s3 sync ../site/ "s3://$SITE_BUCKET/" --delete --only-show-errors
 
 if [ -d "$MEDIA_DIR" ]; then

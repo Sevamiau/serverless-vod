@@ -1,7 +1,7 @@
 import { createSign, createHash } from 'node:crypto';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 
 const ssm = new SSMClient({});
 
@@ -115,6 +115,26 @@ async function registerDevice(userEmail, deviceHash, label, existing, ip) {
   }
 }
 
+// paused or closed: free the slot for other devices now, not after the window
+async function releaseDevice(userEmail, deviceHash) {
+  const cutoff = Math.floor(Date.now() / 1000) - CFG.concurrencyWindowSec;
+  const result = await ddb.send(new QueryCommand({
+    TableName: 'svod-play-events',
+    KeyConditionExpression: 'userEmail = :e AND createdAt > :cutoff',
+    FilterExpression: 'deviceHash = :d',
+    ExpressionAttributeValues: { ':e': userEmail, ':cutoff': cutoff, ':d': deviceHash },
+  }));
+  for (const item of result.Items || []) {
+    await ddb.send(new DeleteCommand({
+      TableName: 'svod-play-events',
+      Key: { userEmail, createdAt: item.createdAt },
+      ConditionExpression: 'deviceHash = :d',
+      ExpressionAttributeValues: { ':d': deviceHash },
+    })).catch((err) => { if (err.name !== 'ConditionalCheckFailedException') throw err; });
+  }
+  return (result.Items || []).length;
+}
+
 async function logPlayEvent(userEmail, deviceHash, ip) {
   const now = Math.floor(Date.now() / 1000);
   await ddb.send(new PutCommand({
@@ -176,6 +196,14 @@ export const handler = async (event) => {
 
   const userEmail = await getUserEmail(event);
   if (!userEmail) return { statusCode: 401, body: JSON.stringify({ error: 'no-session' }) };
+
+  if (body.release === true) {
+    const id = String(body.deviceId || '');
+    if (id.length < 8) return { statusCode: 400, body: JSON.stringify({ error: 'bad-device-id' }) };
+    const hash = sha256(id);
+    console.log(`release ${hash.slice(0, 8)}: ${await releaseDevice(userEmail, hash)} deleted`);
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+  }
 
   const entitlement = await getEntitlement(userEmail);
   if (!entitlement) return { statusCode: 403, body: JSON.stringify({ error: 'no-entitlement' }) };

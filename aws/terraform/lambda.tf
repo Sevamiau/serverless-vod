@@ -59,6 +59,11 @@ resource "aws_iam_role_policy" "lambda_policy" {
           aws_dynamodb_table.play_events.arn,
         ]
       },
+      {
+        Action   = ["dynamodb:DeleteItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.play_events.arn
+      },
 
     ]
   })

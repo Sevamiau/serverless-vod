@@ -10,10 +10,10 @@ locals {
       monthly_budget  = 20
       lambda_caps     = { api = 20, playback_token = 20, webhook = 5 }
       price_ars       = 1
-      film_title      = "La película"
+      film_title      = "El florecer de un bombisto"
     }
     cliente = {
-      domain          = ""
+      domain          = "film.ar"
       serve_on_domain = false
       protect_data    = true
       alert_email     = "sevakunjadas.bms@gmail.com"
@@ -21,7 +21,7 @@ locals {
       lambda_caps     = { api = 20, playback_token = 20, webhook = 5 }
       # set before launch
       price_ars  = 1
-      film_title = "La película"
+      film_title = "El florecer de un bombisto"
     }
   }
 

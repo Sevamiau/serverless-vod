@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Encodes source.mp4 (or test color bars) to HLS in ./movie/.
 # Optional subtitles: subs/<lang>.srt or .vtt
+# SUBS_ONLY=1 ./make-media.sh re-adds subtitles to an existing ./movie/ without re-encoding.
+# SUBS_SCALE=0.96 for subtitles timed on a 24 fps cut of a 25 fps master.
 set -euo pipefail
 cd "$(dirname "$0")"
 OUT=movie
@@ -12,7 +14,8 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
   FP="podman run --rm -v $PWD:/w -w /w --entrypoint ffprobe docker.io/linuxserver/ffmpeg"
 fi
 
-rm -rf "$OUT"
+SUBS_ONLY="${SUBS_ONLY:-}"
+if [ -z "$SUBS_ONLY" ]; then rm -rf "$OUT"; fi
 
 # height, video, maxrate, bufsize
 LADDER=(
@@ -28,7 +31,7 @@ if [ -f source.mp4 ]; then
   PRESET=slow
   DUR=$($FP -v error -show_entries format=duration -of csv=p=0 source.mp4 | cut -d. -f1)
   SRC_H=$($FP -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 source.mp4)
-  echo "-> encoding source.mp4 (${DUR}s, ${SRC_H}p)"
+  echo "-> ${SUBS_ONLY:+subtitles only, }source.mp4 (${DUR}s, ${SRC_H}p)"
 else
   DUR="${DUR:-120}"
   IN=(-f lavfi -i "testsrc2=size=1920x1080:rate=30:duration=$DUR"
@@ -39,6 +42,12 @@ else
   echo "-> no source.mp4: generating color bars (${DUR}s)"
 fi
 
+if [ -n "$SUBS_ONLY" ]; then
+  [ -f "$OUT/master.m3u8" ] || { echo "no $OUT/master.m3u8 to add subtitles to" >&2; exit 1; }
+  rm -rf "$OUT/subs"
+  sed -i -e '/^#EXT-X-MEDIA:TYPE=SUBTITLES/d' -e 's/,SUBTITLES="subs"//' "$OUT/master.m3u8"
+  LABELS=("$(ls -d "$OUT"/[0-9]* | wc -l) renditions kept")
+else
 # no upscaling
 RUNGS=()
 for r in "${LADDER[@]}"; do
@@ -69,6 +78,7 @@ $FF -y -loglevel error "${IN[@]}" \
   -hls_segment_filename "$OUT/%v/seg%04d.ts" \
   -var_stream_map "${STREAMS[*]}" -master_pl_name master.m3u8 \
   "$OUT/%v/index.m3u8"
+fi
 
 shopt -s nullglob
 SUBS=("$SUBS_IN"/*.srt "$SUBS_IN"/*.vtt)
@@ -101,6 +111,16 @@ if [ ${#SUBS[@]} -gt 0 ]; then
     esac
     mkdir -p "$OUT/subs/$lang"
     $FF -y -loglevel error -i "$f" "$OUT/subs/$lang/full.vtt"
+    if [ -n "${SUBS_SCALE:-}" ]; then
+      awk -v k="$SUBS_SCALE" '
+        function ts(x,  p, n, t) {
+          n = split(x, p, ":"); t = (n == 3 ? p[1] * 3600 + p[2] * 60 + p[3] : p[1] * 60 + p[2]) * k
+          return sprintf("%02d:%02d:%06.3f", int(t / 3600), int(t % 3600 / 60), t - int(t / 60) * 60)
+        }
+        $2 == "-->" { $1 = ts($1); $3 = ts($3) }
+        { print }
+      ' "$OUT/subs/$lang/full.vtt" >"$OUT/subs/$lang/scaled.vtt" && mv "$OUT/subs/$lang/scaled.vtt" "$OUT/subs/$lang/full.vtt"
+    fi
     sed -i "1a X-TIMESTAMP-MAP=MPEGTS:$MPEGTS,LOCAL:00:00:00.000" "$OUT/subs/$lang/full.vtt"
     cat >"$OUT/subs/$lang/index.m3u8" <<EOF
 #EXTM3U

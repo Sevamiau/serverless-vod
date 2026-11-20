@@ -18,6 +18,7 @@ function setMenu(open) {
 }
 
 hamburger.addEventListener('click', () => setMenu(!menu.classList.contains('is-open')));
+menu.addEventListener('click', (e) => { if (e.target === menu) setMenu(false); });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && menu.classList.contains('is-open')) setMenu(false);
 });
@@ -37,3 +38,14 @@ document.querySelectorAll('.faqs__item').forEach((item) =>
         });
     })
 );
+
+// Landing background: only when motion and data are welcome
+const heroVideo = document.querySelector('.js-hero-video');
+if (heroVideo) {
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const saveData = navigator.connection && navigator.connection.saveData;
+    if (!reduceMotion && !saveData) {
+        heroVideo.preload = 'auto';
+        heroVideo.play().catch(() => {});
+    }
+}
