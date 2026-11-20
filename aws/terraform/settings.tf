@@ -14,7 +14,7 @@ locals {
     }
     cliente = {
       domain          = "film.ar"
-      serve_on_domain = false
+      serve_on_domain = true
       protect_data    = true
       alert_email     = "sevakunjadas.bms@gmail.com"
       monthly_budget  = 20
