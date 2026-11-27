@@ -51,6 +51,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
         "worker-src 'self' blob:",
         "connect-src 'self'",
         "img-src 'self' data:",
+        "frame-src https://www.youtube-nocookie.com",
         "object-src 'none'",
         "base-uri 'none'",
         "form-action 'self'",

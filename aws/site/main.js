@@ -49,3 +49,28 @@ if (heroVideo) {
         heroVideo.play().catch(() => {});
     }
 }
+
+// YouTube in a dialog, loaded only on click
+const videoDialog = document.querySelector('.js-video-dialog');
+if (videoDialog) {
+    const frame = videoDialog.querySelector('.js-video-frame');
+    const heroVideo2 = document.querySelector('.js-hero-video');
+    document.querySelectorAll('.js-video-open').forEach((btn) => btn.addEventListener('click', () => {
+        const iframe = Object.assign(document.createElement('iframe'), {
+            src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(btn.dataset.video)}?autoplay=1&rel=0`,
+            title: btn.dataset.title || 'Video',
+            allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+            allowFullscreen: true,
+        });
+        frame.replaceChildren(iframe);
+        if (heroVideo2) heroVideo2.pause();
+        videoDialog.showModal();
+    }));
+    const close = () => videoDialog.close();
+    videoDialog.querySelector('.js-video-close').addEventListener('click', close);
+    videoDialog.addEventListener('click', (e) => { if (e.target === videoDialog) close(); });
+    videoDialog.addEventListener('close', () => {
+        frame.replaceChildren();
+        if (heroVideo2 && !matchMedia('(prefers-reduced-motion: reduce)').matches) heroVideo2.play().catch(() => {});
+    });
+}

@@ -57,6 +57,9 @@
 
     <footer class="footer">
         <div class="footer__container container">
+            <button type="button" class="footer__short js-video-open" data-video="-3kP9YZQteA" data-title="Tiempo de sequía">
+                <span class="footer__short-play" aria-hidden="true"></span>Mirá gratis <em>Tiempo de sequía</em>
+            </button>
             <nav class="footer__legal" aria-label="Legales">
                 <a href="terminos.html">Términos</a>
                 <a href="privacidad.html">Privacidad</a>
@@ -64,6 +67,11 @@
             </nav>
         </div>
     </footer>
+
+    <dialog class="video-dialog js-video-dialog" aria-label="Video">
+        <button type="button" class="video-dialog__close js-video-close" aria-label="Cerrar">Cerrar</button>
+        <div class="video-dialog__frame js-video-frame"></div>
+    </dialog>
 
     <script src="main.js"></script>
 </body>

@@ -19,7 +19,7 @@ input { font: inherit; border: 1px solid #ddd; border-radius: 6px; }
 
 .container { width: 100%; max-width: 1440px; margin: 0 auto; }
 .container-sm { width: 100%; max-width: 1165px; margin: 0 auto; padding: 0 20px; }
-body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; position: relative; }
 body > main { flex: 1 0 auto; }
 body.page--light { background: #fff; color: var(--color-text-black); }
 body.page--dark { background: #101010; }
@@ -104,6 +104,16 @@ body.page--dark { background: #101010; }
 .footer__social-container { display: flex; align-items: center; gap: 20px; }
 .footer__social-container a { display: flex; opacity: .85; transition: opacity .2s; }
 .footer__social-container a:hover { opacity: 1; }
+.footer__short { display: inline-flex; align-items: center; gap: 10px; font: 500 14px var(--font-dmsans); letter-spacing: .02em; opacity: .85; transition: opacity .2s; }
+.footer__short:hover { opacity: 1; }
+.footer__short em { font-style: normal; font-weight: 700; }
+.footer__short-play { width: 26px; height: 26px; border: 1.5px solid currentColor; border-radius: 50%; position: relative; flex: none; }
+.footer__short-play::after { content: ""; position: absolute; top: 50%; left: 55%; transform: translate(-50%, -50%); border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent currentColor; }
+.video-dialog { width: min(1100px, 92vw, calc((100dvh - 120px) * 16 / 9)); max-width: none; height: fit-content; margin: auto; padding: 0; border: 0; background: transparent; overflow: visible; }
+.video-dialog::backdrop { background: #000d; backdrop-filter: blur(4px); }
+.video-dialog__frame { aspect-ratio: 16 / 9; background: #000; }
+.video-dialog__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+.video-dialog__close { position: absolute; right: 0; bottom: calc(100% + 12px); font: 600 13px var(--font-dmsans); letter-spacing: .14em; text-transform: uppercase; color: #fff; }
 .footer__legal { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 22px; font: 400 13px var(--font-dmsans); }
 .footer__legal a { opacity: .85; }
 .footer__legal a:hover { opacity: 1; text-decoration: underline; }

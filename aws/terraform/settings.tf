@@ -1,4 +1,3 @@
-# Domain switch: set domain, apply, point the registrar at name_servers,
 # then set serve_on_domain and apply again.
 locals {
   workspace_settings = {
@@ -20,10 +19,9 @@ locals {
       alert_email     = "sevakunjadas.bms@gmail.com"
       monthly_budget  = 20
       lambda_caps     = { api = 20, playback_token = 20, webhook = 5 }
-      # set before launch
-      price_ars     = 1
-      film_title    = "El florecer de un bombisto"
-      contact_email = "hola@film.ar"
+      price_ars       = 4500
+      film_title      = "El florecer de un bombisto"
+      contact_email   = "hola@film.ar"
     }
   }
 
